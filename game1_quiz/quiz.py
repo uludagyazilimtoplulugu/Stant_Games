@@ -312,7 +312,8 @@ class UYTQuiz:
 
         self.img_id += 1
         my_id = self.img_id
-        self.img_label = tk.Label(orta, bg=Panel)
+        self.img_label = tk.Label(orta, bg=Panel, text="Yukleniyor...",
+                                   fg=Gri, font=("Helvetica", 12))
         self.img_label.pack(pady=(0, 10), ipadx=10, ipady=10)
 
         self.fotograf_yukle(soru.get("kat", "teknoloji"))
@@ -351,8 +352,7 @@ class UYTQuiz:
 
     def fotograf_yukle(self, kategori):
         keyword = kategori.lower().replace(" ", "+")
-        lock = random.randint(1, 999999)
-        url = f"https://loremflickr.com/640/360/{keyword}?lock={lock}"
+        url = f"https://loremflickr.com/640/360/{keyword}?lock={random.randint(1, 999999)}"
         my_id = self.img_id
 
         def isle():
