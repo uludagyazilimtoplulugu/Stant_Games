@@ -1,0 +1,31 @@
+# Ignore Windows system files
+Thumbs.db
+ehthumbs.db
+*.pyc
+__pycache__/
+*.pdb
+*.user
+*.suo
+*.ulterior
+
+# Ignore OneDrive and other cloud sync folders
+**/OneDrive/**
+**/AppData/**
+**/AppData/Local/**
+
+# Ignore temp and cache
+**/tmp/**
+**/Temp/
+
+# Ignore IDE and editor files
+.vscode/
+*.swp
+*.swo
+
+# Ignore virtual environments
+venv/
+env/
+.env
+
+# Ignore media capture folders
+game2_camdraw/captures/
