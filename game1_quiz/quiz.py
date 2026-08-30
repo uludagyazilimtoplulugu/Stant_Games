@@ -26,6 +26,7 @@ Kirmizi = "#ef4444"
 Sari = "#f59e0b"
 Beyaz = "#ffffff"
 Gri = "#9ca3af"
+AcikGri = "#d1d5db"
 
 SORULAR = [
     {"soru": "Internet'in babasi olarak bilinen bilim insani kimdir?", "secenekler": ["Tim Berners-Lee", "Vint Cerf", "Steve Jobs", "Bill Gates"], "dogru": 0, "kat": "internet"},
