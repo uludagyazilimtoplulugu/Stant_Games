@@ -178,6 +178,7 @@ class UYTQuiz:
         self.img_label = None
         self.current_img = None
         self.img_id = 0
+        self.img_cache = {}
 
         veritabani_olustur()
         self.ana_ekran()
@@ -238,6 +239,8 @@ class UYTQuiz:
         self.soru_index = 0
         self.kalan_sure = 120
         self.sorular = random.sample(SORULAR, min(10, len(SORULAR)))
+        self.img_cache = {}
+        self.gorselleri_on_yukle()
         self.sure_aktif = True
         self.soru_goster()
 
@@ -316,7 +319,7 @@ class UYTQuiz:
                                    fg=Gri, font=("Helvetica", 12))
         self.img_label.pack(pady=(0, 10), ipadx=10, ipady=10)
 
-        self.fotograf_yukle(soru.get("img", soru.get("kat", "teknoloji")))
+        self.fotograf_yukle(self.soru_index)
 
         tk.Label(orta, text=soru["soru"], font=("Helvetica", 16, "bold"),
                  fg=Beyaz, bg=Siyah, wraplength=900, justify="center").pack(pady=(5, 15))
@@ -350,27 +353,53 @@ class UYTQuiz:
             self.sure_aktif = True
             self.sure_baslat()
 
-    def fotograf_yukle(self, keyword):
-        search = keyword.lower().replace(" ", "+")
-        url = f"https://loremflickr.com/640/360/{search}?lock={random.randint(1, 999999)}"
-        my_id = self.img_id
+    def gorselleri_on_yukle(self):
+        for i, soru in enumerate(self.sorular):
+            keyword = soru.get("img", "technology")
+            search = keyword.lower().replace(" ", "+")
+            url = f"https://loremflickr.com/640/360/{search}?lock={random.randint(1, 999999)}"
+            t = threading.Thread(target=self._gorsel_indir, args=(i, url), daemon=True)
+            t.start()
 
-        def isle():
-            try:
-                r = requests.get(url, timeout=8)
-                if r.status_code == 200:
-                    img = Image.open(BytesIO(r.content))
-                    img = img.resize((640, 360), Image.LANCZOS)
-                    self.current_img = ImageTk.PhotoImage(img)
+    def _gorsel_indir(self, index, url):
+        try:
+            r = requests.get(url, timeout=10)
+            if r.status_code == 200:
+                img = Image.open(BytesIO(r.content))
+                img = img.resize((640, 360), Image.LANCZOS)
+                photo = ImageTk.PhotoImage(img)
+                self.img_cache[index] = photo
+        except Exception:
+            pass
+
+    def fotograf_yukle(self, index):
+        if index in self.img_cache:
+            self.current_img = self.img_cache[index]
+            self.img_label.configure(image=self.current_img, text="")
+        else:
+            soru = self.sorular[index]
+            keyword = soru.get("img", "technology")
+            search = keyword.lower().replace(" ", "+")
+            url = f"https://loremflickr.com/640/360/{search}?lock={random.randint(1, 999999)}"
+            my_id = self.img_id
+
+            def isle():
+                try:
+                    r = requests.get(url, timeout=10)
+                    if r.status_code == 200:
+                        img = Image.open(BytesIO(r.content))
+                        img = img.resize((640, 360), Image.LANCZOS)
+                        self.current_img = ImageTk.PhotoImage(img)
+                        self.img_cache[index] = self.current_img
+                        if self.img_id == my_id and self.img_label:
+                            self.root.after(0, lambda: self.img_label.configure(
+                                image=self.current_img, text=""))
+                except Exception:
                     if self.img_id == my_id and self.img_label:
                         self.root.after(0, lambda: self.img_label.configure(
-                            image=self.current_img, text=""))
-            except Exception:
-                if self.img_id == my_id and self.img_label:
-                    self.root.after(0, lambda: self.img_label.configure(
-                        text="Gorsel yuklenemedi", fg=Gri))
+                            text="Gorsel yuklenemedi", fg=Gri))
 
-        threading.Thread(target=isle, daemon=True).start()
+            threading.Thread(target=isle, daemon=True).start()
 
     def cevap_ver(self, secim):
         self.sure_aktif = False
