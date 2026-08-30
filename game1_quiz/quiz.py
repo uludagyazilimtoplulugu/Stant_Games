@@ -1,10 +1,11 @@
-"""UYT Stant Oyunu 1 - İnteraktif Bilgi Yarışması.
+"""UYT Stant Oyunu 1 - İnteraktif Bilgi Yarışması (Tek Oyuncu, Türkçe, Canlı Tasarım).
 Özellikler:
-  - Canlı sorular (OpenTDB) ve her oyuncuya farklı sorular.
-  - 10 soru, 4 seçenek, her oyuncuya 2 dakika.
-  - Yanlışta süre 15 sn kısalır, doğruda +10 puan.
-  - SQLite ile skor/isim kaydı, sıralama ve liderlik tablosu.
-  - Yeni oyun döngüsü.
+  - Tek oyuncu mod: tek isim girişi
+  - Canlı sorular: OpenTDB'den Türkçe dilinde anlık sorular
+  - 10 soru, 4 seçenek, 2 dakika süre
+  - Yanlışta süre 15 sn kısalır, doğruda +10 puan
+  - SQLite ile skor kaydı ve liderlik tablosu
+  - Oyun bittiğinde otomatik olarak yeni soru seti yükler (sürekli çalışma)
 """
 import os
 import sys
@@ -21,8 +22,17 @@ from PIL import Image, ImageTk, ImageDraw, ImageFont
 import db as db_mod
 
 API = "https://opentdb.com/api.php"
+API_PARAMS = {"type": "multiple", "language": "tr"}  # Türkçe sorular için language=tr
 IMG_CACHE = os.path.join(os.path.dirname(__file__), "img_cache")
 os.makedirs(IMG_CACHE, exist_ok=True)
+
+# UYT renk paleti - canlı ve dikkat çekici
+BG = "#0d1b2a"        # Ana arka plan (dark navy)
+PANEL = "#1b263b"     # Panel/frame arka planı
+ACCENT = "#e63946"    # Kırmızı emphasize (UYT kırmızısı)
+ACCENT2 = "#f4a261"   # Turuncu emphasize (canlı/yönelici)
+LIGHT = "#e0e1dd"     # Açık yazı arka planı
+WHITE = "#ffffff"     # Beyaz tekst
 
 # Soru kategorisi -> resim anahtar kelimesi (loremflickr)
 KATEGORI_RESIM = {
@@ -48,23 +58,16 @@ KATEGORI_RESIM = {
     "Vehicles": "vehicle",
 }
 
-# Arka plan rengi teması (UYT kurumsal tonları)
-BG = "#0d1b2a"
-PANEL = "#1b263b"
-ACCENT = "#e63946"
-ACCENT2 = "#f4a261"
-LIGHT = "#e0e1dd"
-WHITE = "#ffffff"
 
-
-def fetch_pool(n, used_ids):
-    """OpenTDB'den n adet benzersiz soru çeker (kullanılan id'ler hariç)."""
+def fetch_questions(n, used_ids):
+    """OpenTDB'den Türkçe dilinde n adet benzersiz soru çeker."""
     sorular = []
     deneme = 0
-    while len(sorular) < n and deneme < 25:
+    while len(sorular) < n and deneme < 30:
         deneme += 1
         try:
-            r = requests.get(API, params={"amount": 50, "type": "multiple"}, timeout=10)
+            # language=tr parametresiyle Türkçe sorular iste
+            r = requests.get(API, params={"amount": 50, "type": "multiple", "language": "tr"}, timeout=10)
             data = r.json()
         except Exception:
             continue
@@ -90,15 +93,14 @@ class QuizApp:
         self.root.minsize(800, 600)
         self.root.resizable(True, True)
 
-        self.players = []
-        self.scores = {}
-        self.questions = {}          # isim -> [soru...]
+        self.player_name = ""          # Tek oyuncu ismi
+        self.scores = 0
+        self.questions = []            # Tek oyuncu için soru listesi
         self.used_ids = set()
-        self.cur_player = 0
         self.cur_q = 0
         self.remaining = 120
         self.timer_job = None
-        self.img_job = None
+        self.round_count = 0           # Kaç tur oynandığını takip
         self._build_styles()
 
         db_mod.init_db()
@@ -111,83 +113,48 @@ class QuizApp:
         except Exception:
             pass
 
-    # ---------- çerçeve yardımcıları ----------
-    def _clear(self):
-        for w in self.root.winfo_children():
-            w.destroy()
-        if self.timer_job:
-            self.root.after_cancel(self.timer_job)
-            self.timer_job = None
-
-    # ---------- BAŞLANGIÇ EKRANI ----------
+    # ---------- ana başlangıç ekranı (tek oyuncu) ----------
     def show_start(self):
         self._clear()
-        self.players = []
+        self.player_name = ""
+        self.round_count = 0
+        self.scores = 0
+        self.questions = []
+        self.used_ids = set()
+        self.cur_q = 0
+        self.remaining = 120
+
         f = tk.Frame(self.root, bg=BG)
         f.pack(expand=True, fill="both", padx=40, pady=30)
 
-        tk.Label(f, text="UYT BİLGİ YARIŞMASI", font=("Segoe UI", 30, "bold"),
+        # UYT logo-like dekoratif başlık
+        tk.Label(f, text="🏓 UYT BİLGİ YARIŞMASI", font=("Segoe UI", 32, "bold"),
                  fg=ACCENT2, bg=BG).pack(pady=(10, 5))
-        tk.Label(f, text="Oyuncu isimlerini ekleyin ve yarışmayı başlatın",
-                 font=("Segoe UI", 13), fg=LIGHT, bg=BG).pack(pady=(0, 20))
+        tk.Label(f, text="Tek Oyuncu Mod - İnternetten Türkçe Sorular",
+                 font=("Segoe UI", 14), fg=LIGHT, bg=BG).pack(pady=(0, 20))
 
-        entry = tk.Entry(f, font=("Segoe UI", 14), bg=PANEL, fg=WHITE,
+        # Oyuncu ismi girişi
+        tk.Label(f, text="Adınızı giriniz:", font=("Segoe UI", 16), fg=WHITE, bg=BG).pack(anchor="w")
+        entry = tk.Entry(f, font=("Segoe UI", 16), bg=PANEL, fg=WHITE,
                          insertbackground=WHITE, relief="flat", justify="center")
-        entry.pack(ipady=8, pady=6, fill="x", padx=120)
+        entry.pack(ipady=10, pady=6, fill="x", padx=100)
         entry.focus()
 
-        listbox = tk.Listbox(f, font=("Segoe UI", 13), bg=PANEL, fg=WHITE,
-                             relief="flat", height=8, highlightthickness=0)
-        listbox.pack(fill="both", expand=True, pady=10, padx=120)
-
-        def add():
+        def start_game():
             name = entry.get().strip()
             if not name:
+                messagebox.showwarning("Uyarı", "Lütfen bir isim girin.")
                 return
-            if name in self.players:
-                messagebox.showwarning("Tekrar", "Bu isim zaten eklendi.")
-                return
-            if len(self.players) >= 8:
-                messagebox.showwarning("Limit", "En fazla 8 oyuncu.")
-                return
-            self.players.append(name)
-            listbox.insert("end", f"{len(self.players)}. {name}")
-            entry.delete(0, "end")
-
-        def remove():
-            sel = listbox.curselection()
-            if not sel:
-                return
-            i = sel[0]
-            listbox.delete(i)
-            self.players.pop(i)
-            for idx, nm in enumerate(self.players, 1):
-                listbox.insert("end", f"{idx}. {nm}")
-            # listbox sıfırlandığı için yeniden doldur
-            listbox.delete(0, "end")
-            for idx, nm in enumerate(self.players, 1):
-                listbox.insert("end", f"{idx}. {nm}")
-
-        btn_row = tk.Frame(f, bg=BG)
-        btn_row.pack(pady=6)
-        tk.Button(btn_row, text="➕ Ekle", command=add, bg=ACCENT2, fg=BG,
-                  font=("Segoe UI", 12, "bold"), relief="flat", padx=18, pady=6).pack(side="left", padx=6)
-        tk.Button(btn_row, text="➖ Çıkar", command=remove, bg=PANEL, fg=LIGHT,
-                  font=("Segoe UI", 12), relief="flat", padx=18, pady=6).pack(side="left", padx=6)
-        entry.bind("<Return>", lambda e: add())
-
-        def start():
-            if len(self.players) < 1:
-                messagebox.showwarning("Eksik", "En az 1 oyuncu ekleyin.")
-                return
+            self.player_name = name
+            self._clear()
             self.prepare_game()
 
-        bottom = tk.Frame(f, bg=BG)
-        bottom.pack(pady=10)
-        tk.Button(bottom, text="🎮 OYNA", command=start, bg=ACCENT, fg=WHITE,
-                  font=("Segoe UI", 16, "bold"), relief="flat", padx=40, pady=10).pack(side="left", padx=8)
-        tk.Button(bottom, text="🏆 Liderlik", command=lambda: self.show_leaderboard("quiz"),
-                  bg=PANEL, fg=LIGHT, font=("Segoe UI", 13), relief="flat", padx=20, pady=10).pack(side="left", padx=8)
+        btn = tk.Button(f, text="✅ TAMAM BAŞLAT", command=start_game, bg=ACCENT, fg=WHITE,
+                  font=("Segoe UI", 16, "bold"), relief="flat", padx=30, pady=12)
+        btn.pack(pady=20)
+
+        # İpucu
+        
 
     # ---------- OYUN HAZIRLIĞI ----------
     def prepare_game(self):
@@ -197,63 +164,59 @@ class QuizApp:
         loading.pack(expand=True)
 
         def work():
-            total = len(self.players) * 10
-            pool = fetch_pool(total, self.used_ids)
+            pool = fetch_questions(10, self.used_ids)  # 10 Türkçe soru
             if not pool:
                 self.root.after(0, lambda: messagebox.showerror(
                     "Hata", "İnternetten soru alınamadı. Bağlantıyı kontrol edin."))
                 self.root.after(0, self.show_start)
                 return
             random.shuffle(pool)
-            self.questions = {}
-            self.scores = {}
-            for i, name in enumerate(self.players):
-                self.questions[name] = pool[i * 10:(i + 1) * 10]
-                self.scores[name] = 0
-            self.root.after(0, self.start_player)
+            self.questions = pool
+            self.scores = 0
+            self.cur_q = 0
+            self.remaining = 120
+            self.round_count = 1
+            self.root.after(0, self.start_round)
 
         threading.Thread(target=work, daemon=True).start()
 
-    # ---------- OYUNCU TURU ----------
-    def start_player(self):
-        self.cur_player = 0
-        self.next_player()
-
-    def next_player(self):
-        if self.cur_player >= len(self.players):
-            self.show_results()
-            return
-        self.cur_q = 0
-        self.remaining = 120
+    # ---------- TUR BAŞI ----------
+    def start_round(self):
+        # Tur başlangıcı: timer sıfırla, soruyu göster
         self.show_question()
 
     def show_question(self):
         self._clear()
-        name = self.players[self.cur_player]
-        q = self.questions[name][self.cur_q]
+        if self.cur_q >= len(self.questions):
+            self.finished_round()
+            return
 
-        # ÜST BAR
-        top = tk.Frame(self.root, bg=PANEL)
+        q = self.questions[self.cur_q]
+
+        # ÜST BAR - canlı tasarım
+        top = tk.Frame(self.root, bg=PANEL, height=60)
         top.pack(fill="x", padx=0, pady=0)
-        top.columnconfigure(0, weight=1)
-        top.columnconfigure(1, weight=1)
-        top.columnconfigure(2, weight=1)
+        top.configure(highlightthickness=0)
+        # Renge geçişli efekt simülasyonu için renkler
+        top_bg = PANEL
 
         self.timer_lbl = tk.Label(top, text=f"⏱ {self.remaining:02d}:00",
-                                  font=("Segoe UI", 20, "bold"), fg=ACCENT2, bg=PANEL)
-        self.timer_lbl.grid(row=0, column=0, sticky="w", padx=20, pady=12)
+                                  font=("Segoe UI", 20, "bold"), fg=ACCENT2, bg=top_bg)
+        self.timer_lbl.pack(side="left", padx=20, pady=8)
 
-        prog = tk.Label(top, text=f"Soru {self.cur_q + 1}/10",
-                        font=("Segoe UI", 14), fg=LIGHT, bg=PANEL)
-        prog.grid(row=0, column=1)
+        # Round info
+        prog = tk.Label(top, text=f"Tur {self.round_count} - Soru {self.cur_q + 1}/10",
+                        font=("Segoe UI", 13), fg=LIGHT, bg=top_bg)
+        prog.pack(side="right", padx=20, pady=8)
 
-        self.name_lbl = tk.Label(top, text=f"👤 {name}  |  Puan: {self.scores[name]}",
-                                 font=("Segoe UI", 16, "bold"), fg=WHITE, bg=PANEL)
-        self.name_lbl.grid(row=0, column=2, sticky="e", padx=20, pady=12)
+        # Oyuncu ismi
+        name_lbl = tk.Label(top, text=f"👤 {self.player_name}  |  Puan: {self.scores}",
+                            font=("Segoe UI", 14, "bold"), fg=WHITE, bg=top_bg)
+        name_lbl.pack(side="right", padx=100, pady=8)
 
         # ORTA: RESİM + SORU
-        mid = tk.Frame(self.root, bg=BG)
-        mid.pack(expand=True, fill="both", padx=30, pady=10)
+        mid = tk.Frame(self.root, bg=BG, padx=30, pady=10)
+        mid.pack(expand=True, fill="both")
 
         img_frame = tk.Frame(mid, bg=PANEL, relief="ridge", bd=2)
         img_frame.pack(pady=(0, 12))
@@ -343,71 +306,49 @@ class QuizApp:
 
     def _tick(self):
         if self.remaining <= 0:
-            self.finish_player()
+            self.finished_round()
             return
         m, s = divmod(self.remaining, 60)
         self.timer_lbl.configure(text=f"⏱ {m:02d}:{s:02d}")
+        # Süre azalırken renk değişimi (gerilim effectively)
         if self.remaining <= 15:
             self.timer_lbl.configure(fg=ACCENT)
+        elif self.remaining <= 30:
+            self.timer_lbl.configure(fg=ACCENT2)
         self.remaining -= 1
         self.timer_job = self.root.after(1000, self._tick)
 
     def answer(self, chosen, correct):
-        name = self.players[self.cur_player]
         if html.unescape(chosen) == html.unescape(correct):
-            self.scores[name] += 10
+            self.scores += 10
         else:
             self.remaining -= 15
             if self.remaining < 0:
                 self.remaining = 0
         self.cur_q += 1
-        if self.cur_q >= 10 or self.remaining <= 0:
-            self.finish_player()
+        if self.cur_q >= 10:
+            self.finished_round()
         else:
             self.show_question()
 
-    def finish_player(self):
-        if self.timer_job:
-            self.root.after_cancel(self.timer_job)
-            self.timer_job = None
-        name = self.players[self.cur_player]
-        db_mod.kaydet("quiz", name, self.scores[name])
-        self.cur_player += 1
-        self.next_player()
+    def finished_round(self):
+        """Sorular bittikten sonra: skor kaydet, yeni tur yükle."""
+        # Skoru veritabanına kaydet
+        db_mod.kaydet("quiz_single", self.player_name, self.scores)
 
-    # ---------- SONUÇ / SIRALAMA ----------
-    def show_results(self):
-        self._clear()
-        # Bu oyunun sıralaması
-        ranking = sorted(self.players, key=lambda n: self.scores[n], reverse=True)
-        f = tk.Frame(self.root, bg=BG)
-        f.pack(expand=True, fill="both", padx=40, pady=30)
+        self.round_count += 1
+        self.cur_q = 0
+        self.remaining = 120
 
-        tk.Label(f, text="🏁 OYUN SONU - SIRALAMA", font=("Segoe UI", 26, "bold"),
-                 fg=ACCENT2, bg=BG).pack(pady=(0, 20))
+        # Yeni soru seti otomatik yükle (sürekli oyun simülasyonu)
+        # Kullanıcı onayını sorsak da otomatik olarak devam edelim
+        def load_next():
+            self.prepare_game()  # Yeni 10 soru yığını getir
 
-        medals = ["🥇", "🥈", "🥉"]
-        for i, name in enumerate(ranking):
-            color = ACCENT if i == 0 else PANEL
-            fg = WHITE if i == 0 else LIGHT
-            row = tk.Frame(f, bg=color, relief="flat")
-            row.pack(fill="x", pady=5, padx=80)
-            place = medals[i] if i < 3 else f"{i + 1}."
-            tk.Label(row, text=f"{place}  {name}", font=("Segoe UI", 16, "bold"),
-                     fg=fg, bg=color, anchor="w", padx=15, pady=10).pack(side="left")
-            tk.Label(row, text=f"{self.scores[name]} puan", font=("Segoe UI", 16),
-                     fg=fg, bg=color, anchor="e", padx=15, pady=10).pack(side="right")
+        # 3 saniye bekletip sonra yeni tur
+        self.root.after(2500, load_next)
 
-        bottom = tk.Frame(f, bg=BG)
-        bottom.pack(pady=25)
-        tk.Button(bottom, text="🔄 YENİ OYUN", command=self.show_start,
-                  bg=ACCENT, fg=WHITE, font=("Segoe UI", 15, "bold"),
-                  relief="flat", padx=30, pady=10).pack(side="left", padx=8)
-        tk.Button(bottom, text="🏆 Liderlik", command=lambda: self.show_leaderboard("quiz"),
-                  bg=PANEL, fg=LIGHT, font=("Segoe UI", 13), relief="flat",
-                  padx=20, pady=10).pack(side="left", padx=8)
-
-    # ---------- LİDERLİK TABLOSU ----------
+    # ---------- LİDERLİK ----------
     def show_leaderboard(self, oyun):
         self._clear()
         f = tk.Frame(self.root, bg=BG)

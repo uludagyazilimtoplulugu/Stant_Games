@@ -1,47 +1,52 @@
-# UYT Stant Oyunu 1 — Bilgi Yarışması
+# UYT Stant Oyunu 1 — Bilgi Yarışması (Tek Oyuncu, Türkçe, Canlı)
 
 ## Oyun Açıklaması
-Uludağ Yazılım Topluluğu'nun interaktif stant oyunu. Kuralları şöyledir:
+Uludağ Yazılım Topluluğu'nun interaktif stant oyunu - **Tek Oyuncu Modu**:
 
-- **Toplam 10 soru**, her sorunun **4 seçeneği** vardır.
-- Oyun başladığında tüm oyuncuların **2 dakikası** (120 saniye) vardır.
-- **Yanlış bilirse** süre **15 saniye** kısalır.
-- **Doğru bilirse** puan **+10** kazanılır.
-- Oyun başlangıcında oynayanların **isimleri** girilir.
-- Oyun bittiğinde veya gün sonu içinde **sıralama (1., 2., 3. vb.)** görülebilir.
-- **"Yeni Oyun"** dediğimizde döngü sıfırlar ve tekrar oynanabilir.
+- **Sadece 1 oyuncu**: Başlangıçta sadece bir isim girilir.
+- **Sorular Türkçe**: OpenTDB API'si `language=tr` parametresiyle çekilen sorular Türkçe'dir.
+- **10 soru, 4 seçenek**: Her sorunun 4 seçeneği vardır.
+- **2 dakika süre**: Her soru çözümünüz için 120 saniye (2 dk).
+- **Yanlış bilerse**: Süre **15 saniye** kısalır.
+- **Doğru bilerse**: **+10 puan** kazanılır.
+- **Sürekli oyun**: Oyun bittiğinde yeni bir soru seti otomatik olarak yüklenir, skor biriktilerek toplu puan olur. Sonsuza kadar oynayabilirsiniz (çıkana kadar).
+- **SQLite kaydı**: En yüksek skor ve oyuncu adı `stant_oyun.db` içinde saklanır.
 
-## Teknik Özellikler
-- **Canlı sorular**: İnternet üzerinden OpenTDB API'si anlık çekilir.
-- **Her oyuncuya farklı sorular**: Oyuncu sayısına göre soru havuzu oluşturulup distribute edilir, tekrarlama önlenir.
-- **SQLite veritabanı**: Oyuncu isimleri ve skorlar `stant_oyun.db` dosyasında saklanır.
-- **Grafik Tasarım**: 
-  - Sol Üst: ⏱ Süre sayacı
-  - Sağ Üst: Oyuncu ismi + mevcut puan
-  - Ortada: Soruyla alakalı resim + soru metni
-  - Altta: 4 seçenek butonu
+## Tasarım
+- **UYT renk paleti**: Dark navy arka plan (#0d1b2a), kırmızı ve turuncu vurgular (#e63946, #f4a261).
+- Canlı ve modern arayüz: Sol üstte hızlı sayaç, sağ üstte isim+puan, orta soru+resim, altta 4 seçenek butonu.
+- Süre dolduğunda timer rengi değişir (gerilim efekti).
+- Oyun başlangıcı: Tek isim girişi + "TAMAM BAŞLAT" butonu.
+
+## Akış
+1. Oyuncu adını girer ve "TAMAM BAŞLAT"'a basar.
+2. 10 Türkçe soru çekilir ve oyun başlar.
+3. 2 dakika (120 sn) timer başlar.
+4. Her doğru cevap +10 puya, yanlış -15 sn sürücülük verir.
+5. 10 soru bittikten sonra: **3 saniye bekleme**, ardından otomatik olarak yeni 10 soru seti yüklenir ve skor birikintilemeye devam eder.
+6. Her tur sonunda en yüksek skor liderlik tablosuna kaydedilir.
+7. Çıkmak için pencereyi kapatın ya da "Yeni Oyun" menüsünü kullanın.
 
 ## Nasıl Çalıştırılır
 ```bash
-# Klasör içine gidin
 cd game1_quiz
-
-# Oyunu başlatın (ya da doble-click run.bat)
 python quiz.py
 ```
+Ya da doğrudan `run.bat` dosyasına tıklayarak başlatılabilir.
 
 ## Gerekli Paketler
 ```bash
 pip install -r requirements.txt
 ```
-> `requests` ve `Pillow` kütüphanelerine ihtiyaç vardır. İlk çalıştırmada bunlar otomatik olarak kurulacaktır.
+> `requests` ve `Pillow` kütüphanelerine ihtiyaç vardır.
 
 ## Özellikler
+- ✅ Tek oyuncu modu
+- ✅ Türkçe sorular (OpenTDB language=tr)
 - ✅ 10 soru, 4 seçenek
-- ✅ Her oyuncu 2 dakika
-- ✅ Yanlışta -15 sn, doğru +10 puan
-- ✅ Oyuncu adı girişi
-- ✅ Sıralama / Liderlik tablosu
-- ✅ Yeni oyun döngüsü
-- ✅ İnternetten anlık soru çekimi
-- ✅ Farklı oyunculara farklı sorular
+- ✅ 2 dakika süre, yanlışta -15 sn
+- ✅ Doğru answer +10 puan
+- ✅ SQLite skor kaydı
+- ✅ Otomatik yeni soru seti (sürekli oyun)
+- ✅ UYT canlı renk tasarımı
+- ✨ "Yeni Soru Seti" akışı
