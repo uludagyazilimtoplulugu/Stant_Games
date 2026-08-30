@@ -351,7 +351,8 @@ class UYTQuiz:
 
     def fotograf_yukle(self, kategori):
         keyword = kategori.lower().replace(" ", "+")
-        url = f"https://loremflickr.com/640/360/{keyword}"
+        lock = random.randint(1, 999999)
+        url = f"https://loremflickr.com/640/360/{keyword}?lock={lock}"
         my_id = self.img_id
 
         def isle():
