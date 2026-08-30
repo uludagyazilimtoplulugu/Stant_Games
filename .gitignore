@@ -29,3 +29,7 @@ env/
 
 # Ignore media capture folders
 game2_camdraw/captures/
+
+# Ignore quiz runtime files
+game1_quiz/img_cache/
+game1_quiz/skorlar.db
