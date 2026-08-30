@@ -177,6 +177,7 @@ class UYTQuiz:
         self.timer_id = None
         self.img_label = None
         self.current_img = None
+        self.img_id = 0
 
         veritabani_olustur()
         self.ana_ekran()
@@ -309,9 +310,10 @@ class UYTQuiz:
         orta = tk.Frame(self.root, bg=Siyah)
         orta.pack(expand=True, fill="both", padx=40, pady=10)
 
-        self.img_label = tk.Label(orta, bg=Panel, width=70, height=14)
-        self.img_label.pack(pady=(0, 10))
-        self.img_label.configure(text="Yukleniyor...", fg=Gri, font=("Helvetica", 12))
+        self.img_id += 1
+        my_id = self.img_id
+        self.img_label = tk.Label(orta, bg=Panel)
+        self.img_label.pack(pady=(0, 10), ipadx=10, ipady=10)
 
         self.fotograf_yukle(soru.get("kat", "teknoloji"))
 
@@ -349,20 +351,23 @@ class UYTQuiz:
 
     def fotograf_yukle(self, kategori):
         keyword = kategori.lower().replace(" ", "+")
-        url = f"https://loremflickr.com/500/300/{keyword}"
+        url = f"https://loremflickr.com/640/360/{keyword}"
+        my_id = self.img_id
 
         def isle():
             try:
                 r = requests.get(url, timeout=8)
                 if r.status_code == 200:
                     img = Image.open(BytesIO(r.content))
-                    img = img.resize((500, 300), Image.LANCZOS)
+                    img = img.resize((640, 360), Image.LANCZOS)
                     self.current_img = ImageTk.PhotoImage(img)
-                    self.root.after(0, lambda: self.img_label.configure(
-                        image=self.current_img, text=""))
+                    if self.img_id == my_id and self.img_label:
+                        self.root.after(0, lambda: self.img_label.configure(
+                            image=self.current_img, text=""))
             except Exception:
-                self.root.after(0, lambda: self.img_label.configure(
-                    text="Gorsel yuklenemedi", fg=Gri))
+                if self.img_id == my_id and self.img_label:
+                    self.root.after(0, lambda: self.img_label.configure(
+                        text="Gorsel yuklenemedi", fg=Gri))
 
         threading.Thread(target=isle, daemon=True).start()
 
