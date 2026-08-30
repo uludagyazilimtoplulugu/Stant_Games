@@ -11,9 +11,10 @@ import threading
 import tkinter as tk
 from tkinter import messagebox
 from io import BytesIO
+import hashlib
 
 import requests
-from PIL import Image, ImageTk
+from PIL import Image, ImageTk, ImageDraw, ImageFont
 
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "skorlar.db")
 
@@ -29,103 +30,86 @@ Gri = "#9ca3af"
 AcikGri = "#d1d5db"
 
 SORULAR = [
-    {"soru": "Internet'in babasi olarak bilinen bilim insani kimdir?", "secenekler": ["Tim Berners-Lee", "Vint Cerf", "Steve Jobs", "Bill Gates"], "dogru": 0, "img": "world wide web"},
-    {"soru": "Ilk bilgisayarin adi neydi?", "secenekler": ["ENIAC", "UNIVAC", "Colossus", "Altair"], "dogru": 0, "img": "vintage computer eniac"},
-    {"soru": "Yapay zeka terimi ilk kez hangi yilda kullanildi?", "secenekler": ["1956", "1970", "1985", "2000"], "dogru": 0, "img": "artificial intelligence brain"},
-    {"soru": "Twitter'in kurucusu kimdir?", "secenekler": ["Jack Dorsey", "Mark Zuckerberg", "Larry Page", "Jeff Bezos"], "dogru": 0, "img": "twitter social media"},
-    {"soru": "Dunyada en cok kullanilan programlama dili hangisidir?", "secenekler": ["Python", "Java", "C", "JavaScript"], "dogru": 3, "img": "programming code screen"},
-    {"soru": "Google hangi yil kuruldu?", "secenekler": ["1998", "2000", "2004", "1995"], "dogru": 0, "img": "google search engine"},
-    {"soru": "Bluetooth teknolojisi hangi ulkenin kralinin adini tasir?", "secenekler": ["Danimarka", "Norvec", "Isvec", "Finlandiya"], "dogru": 0, "img": "bluetooth wireless"},
-    {"soru": "Ilk iPhone hangi yil piyasaya suruldu?", "secenekler": ["2007", "2005", "2009", "2010"], "dogru": 0, "img": "iphone smartphone"},
-    {"soru": "Python programlama dili neden 'Python' olarak adlandirilmistir?", "secenekler": ["Monty Python'dan", "Yilan turunden", "Kurucunun hayvanindan", "Rastgele secilmis"], "dogru": 0, "img": "python snake programming"},
-    {"soru": "Dunyada ilk kez e-posta hangi yilda gonderildi?", "secenekler": ["1971", "1980", "1990", "1965"], "dogru": 0, "img": "email envelope inbox"},
-    {"soru": "ChatGPT hangi sirket tarafindan gelistirildi?", "secenekler": ["OpenAI", "Google", "Meta", "Microsoft"], "dogru": 0, "img": "chatbot artificial intelligence"},
-    {"soru": "Amazon'un kurucusu kimdir?", "secenekler": ["Jeff Bezos", "Elon Musk", "Bill Gates", "Mark Zuckerberg"], "dogru": 0, "img": "amazon packages delivery"},
-    {"soru": "Dunyada en cok indirilen mobil uygulama hangisidir?", "secenekler": ["TikTok", "Instagram", "WhatsApp", "Facebook"], "dogru": 0, "img": "mobile apps phone"},
-    {"soru": "Yapay zeka ile insan beyni arasindaki en buyuk fark nedir?", "secenekler": ["Duygu ve yaraticilik", "Hiz", "Bellek", "Islem gucu"], "dogru": 0, "img": "human brain vs computer"},
-    {"soru": "Mars'a ilk insansiz araci hangi ulke gonderdi?", "secenekler": ["ABD", "Rusya", "Cin", "Avrupa"], "dogru": 0, "img": "mars rover space"},
-    {"soru": "Dunyada en cok kullanilan sosyal medya platformu hangisidir?", "secenekler": ["Facebook", "YouTube", "Instagram", "TikTok"], "dogru": 0, "img": "social media icons"},
-    {"soru": "Blockchain teknolojisi aslinda ne icin gelistirildi?", "secenekler": ["Bitcoin icin", "Oyun icin", "Egitim icin", "Saglik icin"], "dogru": 0, "img": "blockchain cryptocurrency"},
-    {"soru": "Yapay zeka'da 'machine learning' ne anlama gelir?", "secenekler": ["Makine ogrenmesi", "Veri depolama", "Ag baglantisi", "Dosya donusumu"], "dogru": 0, "img": "machine learning neural network"},
-    {"soru": "Ilk web tarayicisinin adi neydi?", "secenekler": ["WorldWideWeb", "Netscape", "Internet Explorer", "Mosaic"], "dogru": 0, "img": "web browser history"},
-    {"soru": "Elon Musk hangi sirketin kurucusudur?", "secenekler": ["Tesla ve SpaceX", "Apple", "Google", "Amazon"], "dogru": 0, "img": "tesla electric car rocket"},
-    {"soru": "Dunyada ilk kez 3D baski ile yapilan ev hangi ulkede basildi?", "secenekler": ["Cin", "Hollanda", "ABD", "Japonya"], "dogru": 0, "img": "3d printing house"},
-    {"soru": "Yapay zeka'nin en cok kullanildigi alan hangisidir?", "secenekler": ["Tanim ve oneri", "Oyun", "Muzik", "Yemek"], "dogru": 0, "img": "artificial intelligence application"},
-    {"soru": "Dunyada en cok kullanilan isletim sistemi hangisidir?", "secenekler": ["Windows", "macOS", "Linux", "Android"], "dogru": 0, "img": "operating system computer"},
-    {"soru": "Netflix aslinda hangi hizmeti sunuyordu?", "secenekler": ["DVD kiralama", "Muzik streaming", "Oyun", "Alisveris"], "dogru": 0, "img": "netflix streaming movie"},
-    {"soru": "Yapay zeka ile yapilan ilk sanat eseri hangi yilda satildi?", "secenekler": ["2018", "2015", "2020", "2010"], "dogru": 0, "img": "ai generated art painting"},
-    {"soru": "Dunyada ilk kez yapay zeka ile yazilan bir kitap hangi yilda yayinlandi?", "secenekler": ["2016", "2010", "2020", "2005"], "dogru": 0, "img": "robot writing book"},
-    {"soru": "Tesla'nin elektrikli arabalari hangi ozelligiyle taninir?", "secenekler": ["Otonom surus", "Hiz", "Tasarim", "Fiyat"], "dogru": 0, "img": "tesla self driving car"},
-    {"soru": "Dunyada en cok kullanilan arama motoru hangisidir?", "secenekler": ["Google", "Bing", "Yahoo", "Yandex"], "dogru": 0, "img": "search engine magnifying glass"},
-    {"soru": "Yapay zeka'da 'deep learning' ne anlama gelir?", "secenekler": ["Derin ogrenme", "Hizli islem", "Bellek yonetimi", "Ag baglantisi"], "dogru": 0, "img": "deep learning layers"},
-    {"soru": "Instagram'i kim olusturmustu?", "secenekler": ["Kevin Systrom", "Mark Zuckerberg", "Jack Dorsey", "Evan Spiegel"], "dogru": 0, "img": "instagram photo app"},
-    {"soru": "Dunyada ilk kez drone ile teslimat hangi sirket tarafindan yapildi?", "secenekler": ["Amazon", "Google", "DHL", "FedEx"], "dogru": 0, "img": "drone delivery package"},
-    {"soru": "Yapay zeka'nin en buyuk riski nedir?", "secenekler": ["Is kaybi", "Hiz", "Maliyet", "Depolama"], "dogru": 0, "img": "robot danger warning"},
-    {"soru": "Dunyada en cok kullanilan bulut hizmeti hangisidir?", "secenekler": ["Amazon AWS", "Google Cloud", "Microsoft Azure", "Dropbox"], "dogru": 0, "img": "cloud computing server"},
-    {"soru": "Spotify hangi ulkede kuruldu?", "secenekler": ["Isvec", "Norvec", "Finlandiya", "Danimarka"], "dogru": 0, "img": "spotify music streaming"},
-    {"soru": "Yapay zeka ile yapilan ilk muzik hangi yilda bestelendi?", "secenekler": ["2016", "2010", "2020", "2005"], "dogru": 0, "img": "ai music composition"},
-    {"soru": "Dunyada en cok kullanilan mesajlasma uygulamasi hangisidir?", "secenekler": ["WhatsApp", "Telegram", "Signal", "iMessage"], "dogru": 0, "img": "messaging chat app"},
-    {"soru": "Yapay zeka ile yapilan ilk film sahnesi hangi filmde kullanildi?", "secenekler": ["Star Wars", "Matrix", "Avatar", "Iron Man"], "dogru": 0, "img": "ai movie special effects"},
-    {"soru": "Dunyada ilk kez 5G teknolojisi hangi yilda kullanima girdi?", "secenekler": ["2019", "2015", "2020", "2022"], "dogru": 0, "img": "5g network speed"},
-    {"soru": "Yapay zeka'nin en cok kullanildigi saglik alani hangisidir?", "secenekler": ["Tani ve goruntuleme", "Ameliyat", "Ilac uretimi", "Hemsirelik"], "dogru": 0, "img": "ai medical diagnosis"},
-    {"soru": "Dunyada en cok kullanilan e-ticaret sitesi hangisidir?", "secenekler": ["Amazon", "eBay", "Alibaba", "Trendyol"], "dogru": 0, "img": "ecommerce shopping online"},
-    {"soru": "Yapay zeka ile yapilan ilk selfie hangi yilda cekildi?", "secenekler": ["2015", "2010", "2018", "2020"], "dogru": 0, "img": "ai selfie face filter"},
-    {"soru": "Dunyada en cok kullanilan video platformu hangisidir?", "secenekler": ["YouTube", "TikTok", "Twitch", "Vimeo"], "dogru": 0, "img": "youtube video streaming"},
-    {"soru": "Yapay zeka ile yapilan ilk yarisma hangi platformda duzenlendi?", "secenekler": ["Kaggle", "GitHub", "Stack Overflow", "Reddit"], "dogru": 0, "img": "data science competition"},
-    {"soru": "Dunyada en cok kullanilan yapay zeka asistani hangisidir?", "secenekler": ["Siri", "Alexa", "Google Assistant", "Cortana"], "dogru": 0, "img": "voice assistant smart speaker"},
-    {"soru": "Yapay zeka ile yapilan ilk yemek tarifi hangi yilda paylasildi?", "secenekler": ["2017", "2015", "2020", "2010"], "dogru": 0, "img": "ai cooking recipe"},
-    {"soru": "Dunyada en cok kullanilan bulut depolama hizmeti hangisidir?", "secenekler": ["Google Drive", "Dropbox", "OneDrive", "iCloud"], "dogru": 0, "img": "cloud storage drive"},
-    {"soru": "Yapay zeka ile yapilan ilk tani sistemi hangi hastalik icin kullanildi?", "secenekler": ["Kanser", "Diabet", "Kalp hastaligi", "Grip"], "dogru": 0, "img": "cancer detection ai scan"},
-    {"soru": "Dunyada en cok kullanilan kod editoru hangisidir?", "secenekler": ["VS Code", "Sublime Text", "Atom", "Notepad++"], "dogru": 0, "img": "code editor programming"},
-    {"soru": "Yapay zeka ile yapilan ilk cevrimici egitim platformu hangisidir?", "secenekler": ["Khan Academy", "Coursera", "Udemy", "edX"], "dogru": 0, "img": "online education learning"},
-    {"soru": "Dunyada en cok kullanilan mobil isletim sistemi hangisidir?", "secenekler": ["Android", "iOS", "HarmonyOS", "KaiOS"], "dogru": 0, "img": "mobile operating system"},
-    {"soru": "Yapay zeka ile yapilan ilk guvenlik sistemi hangi alanda kullanildi?", "secenekler": ["Yuz tanima", "Parmak izi", "Ses tanima", "Goz tanima"], "dogru": 0, "img": "facial recognition security"},
-    {"soru": "Dunyada en cok kullanilan veritabani yonetim sistemi hangisidir?", "secenekler": ["MySQL", "PostgreSQL", "MongoDB", "Oracle"], "dogru": 0, "img": "database management server"},
-    {"soru": "Yapay zeka ile yapilan ilk otomobil hangi sirket tarafindan uretildi?", "secenekler": ["Tesla", "Google", "Apple", "BMW"], "dogru": 0, "img": "self driving autonomous car"},
-    {"soru": "Dunyada en cok kullanilan oyun motoru hangisidir?", "secenekler": ["Unity", "Unreal Engine", "Godot", "CryEngine"], "dogru": 0, "img": "game engine 3d graphics"},
-    {"soru": "Yapay zeka ile yapilan ilk tarih kitabi hangi yilda yayinlandi?", "secenekler": ["2018", "2015", "2020", "2010"], "dogru": 0, "img": "ai written history book"},
-    {"soru": "Dunyada en cok kullanilan web framework'u hangisidir?", "secenekler": ["React", "Angular", "Vue.js", "Django"], "dogru": 0, "img": "web development framework"},
-    {"soru": "Yapay zeka ile yapilan ilk muzik albumu hangi yilda cikti?", "secenekler": ["2016", "2010", "2020", "2005"], "dogru": 0, "img": "ai album music production"},
-    {"soru": "Dunyada en cok kullanilan versiyon kontrol sistemi hangisidir?", "secenekler": ["Git", "SVN", "Mercurial", "Perforce"], "dogru": 0, "img": "git version control branching"},
-    {"soru": "Yapay zeka ile yapilan ilk guzel sanatlar sergisi hangi yilda acildi?", "secenekler": ["2016", "2010", "2020", "2015"], "dogru": 0, "img": "ai art gallery exhibition"},
-    {"soru": "Dunyada en cok kullanilan iletisim araci hangisidir?", "secenekler": ["E-posta", "Telefon", "Mektup", "Telegram"], "dogru": 0, "img": "communication smartphone"},
-    {"soru": "Yapay zeka ile yapilan ilk edebi eser hangi turdeydi?", "secenekler": ["Siir", "Roman", "Hikaye", "Oyun"], "dogru": 0, "img": "robot writing poetry"},
-    {"soru": "Dunyada en cok kullanilan yapay zeka kutuphanesi hangisidir?", "secenekler": ["TensorFlow", "PyTorch", "Keras", "Scikit-learn"], "dogru": 0, "img": "tensorflow machine learning"},
-    {"soru": "Yapay zeka ile yapilan ilk hava durumu tahmini hangi yilda yapildi?", "secenekler": ["2015", "2010", "2020", "2005"], "dogru": 0, "img": "weather forecast prediction ai"},
-    {"soru": "Dunyada en cok kullanilan veri analiz araci hangisidir?", "secenekler": ["Excel", "Tableau", "Power BI", "Google Sheets"], "dogru": 0, "img": "data analysis chart graph"},
-    {"soru": "Yapay zeka ile yapilan ilk akilli sehir projesi hangi ulkede baslatildi?", "secenekler": ["Cin", "ABD", "Japonya", "G. Kore"], "dogru": 0, "img": "smart city technology"},
-    {"soru": "Dunyada en cok kullanilan web tarayicisi hangisidir?", "secenekler": ["Chrome", "Safari", "Firefox", "Edge"], "dogru": 0, "img": "web browser chrome"},
-    {"soru": "Yapay zeka ile yapilan ilk ticari robot hangi sirket tarafindan uretildi?", "secenekler": ["Boston Dynamics", "Tesla", "Honda", "SoftBank"], "dogru": 0, "img": "boston dynamics robot"},
-    {"soru": "Dunyada en cok kullanilan bulut bilisim platformu hangisidir?", "secenekler": ["AWS", "Azure", "Google Cloud", "IBM Cloud"], "dogru": 0, "img": "aws cloud platform"},
-    {"soru": "Yapay zeka ile yapilan ilk tani dogruluk orani hangi hastalikta en yuksekti?", "secenekler": ["Deri kanseri", "Goz hastaligi", "Kalp hastaligi", "Diyabet"], "dogru": 0, "img": "skin cancer detection ai"},
-    {"soru": "Dunyada en cok kullanilan mobil uygulama gelistirme dili hangisidir?", "secenekler": ["Swift", "Kotlin", "Flutter", "React Native"], "dogru": 0, "img": "mobile app development"},
-    {"soru": "Yapay zeka ile yapilan ilk cevrimici yarisma odulu ne kadardi?", "secenekler": ["1 milyon dolar", "100 bin dolar", "10 bin dolar", "1 milyar dolar"], "dogru": 0, "img": "prize money competition"},
-    {"soru": "Dunyada en cok kullanilan siber guvenlik araci hangisidir?", "secenekler": ["Firewall", "Antivirus", "VPN", "Shredder"], "dogru": 0, "img": "cybersecurity firewall shield"},
-    {"soru": "Yapay zeka ile yapilan ilk otomatik ceviri sistemi hangi diller arasinda calisiyordu?", "secenekler": ["Ingilizce-Fransizca", "Turkce-Ingilizce", "Cince-Ingilizce", "Japonca-Ingilizce"], "dogru": 0, "img": "ai translation language"},
-    {"soru": "Dunyada en cok kullanilan yapay zeka gorsel olusturucu hangisidir?", "secenekler": ["DALL-E", "Midjourney", "Stable Diffusion", "Firefly"], "dogru": 0, "img": "dalle ai image generation"},
-    {"soru": "Yapay zeka ile yapilan ilk tani sistemi hangi hastaneyde kullanildi?", "secenekler": ["Mayo Clinic", "Harvard", "Stanford", "Oxford"], "dogru": 0, "img": "hospital ai diagnostic"},
-    {"soru": "Dunyada en cok kullanilan api yonetim araci hangisidir?", "secenekler": ["Postman", "Swagger", "Insomnia", "cURL"], "dogru": 0, "img": "api development postman"},
-    {"soru": "Yapay zeka ile yapilan ilk otomatik soforluk sistemi hangi marka arabada kullanildi?", "secenekler": ["Tesla", "BMW", "Mercedes", "Audi"], "dogru": 0, "img": "autopilot self driving"},
-    {"soru": "Dunyada en cok kullanilan yapay zeka sesli asistani hangisidir?", "secenekler": ["Alexa", "Siri", "Google Assistant", "Cortana"], "dogru": 0, "img": "alexa echo smart speaker"},
-    {"soru": "Yapay zeka ile yapilan ilk otomatik kod inceleme araci hangi yilda yayinlandi?", "secenekler": ["2017", "2015", "2020", "2010"], "dogru": 0, "img": "code review automation"},
-    {"soru": "Dunyada en cok kullanilan yapay zeka video olusturucu hangisidir?", "secenekler": ["Sora", "Runway", "Pika", "HeyGen"], "dogru": 0, "img": "sora ai video generation"},
-    {"soru": "Yapay zeka ile yapilan ilk otomatik muzik bestecisi hangi turde eserler olusturuyordu?", "secenekler": ["Klasik muzik", "Pop", "Rock", "Jazz"], "dogru": 0, "img": "ai classical music piano"},
-    {"soru": "Dunyada en cok kullanilan yapay zeka metin duzenleyicisi hangisidir?", "secenekler": ["Grammarly", "Hemingway", "ProWritingAid", "QuillBot"], "dogru": 0, "img": "grammarly writing assistant"},
-    {"soru": "Yapay zeka ile yapilan ilk otomatik e-posta yanitlama sistemi hangi yilda kullanildi?", "secenekler": ["2015", "2010", "2020", "2005"], "dogru": 0, "img": "email auto reply ai"},
-    {"soru": "Dunyada en cok kullanilan yapay zeka fotografcilik uygulamasi hangisidir?", "secenekler": ["Lensa", "Remini", "FaceApp", "Prisma"], "dogru": 0, "img": "lensa ai photo editing"},
-    {"soru": "Yapay zeka ile yapilan ilk otomatik veri girisi sistemi hangi alanda kullanildi?", "secenekler": ["Bankacilik", "Saglik", "Egitim", "Uretim"], "dogru": 0, "img": "data entry automation"},
-    {"soru": "Dunyada en cok kullanilan yapay zeka chatbot platformu hangisidir?", "secenekler": ["ChatGPT", "Bard", "Claude", "Perplexity"], "dogru": 0, "img": "chatgpt conversation ai"},
-    {"soru": "Yapay zeka ile yapilan ilk otomatik hukuki analiz sistemi hangi ulkede kullanildi?", "secenekler": ["ABD", "Ingiltere", "Almanya", "Japonya"], "dogru": 0, "img": "ai legal law justice"},
-    {"soru": "Dunyada en cok kullanilan yapay zeka egitim platformu hangisidir?", "secenekler": ["Coursera", "Udacity", "DataCamp", "Kaggle Learn"], "dogru": 0, "img": "online learning platform"},
-    {"soru": "Yapay zeka ile yapilan ilk otomatik ceviri cihazi hangi ulkede uretildi?", "secenekler": ["Japonya", "Cin", "ABD", "G. Kore"], "dogru": 0, "img": "translator device ai"},
-    {"soru": "Dunyada en cok kullanilan yapay zeka tani araci hangi hastalik icin kullaniliyor?", "secenekler": ["Kanser", "Kalp hastaligi", "Diyabet", "Grip"], "dogru": 0, "img": "heart disease ai scan"},
-    {"soru": "Yapay zeka ile yapilan ilk otomatik mali analiz sistemi hangi yilda baslatildi?", "secenekler": ["2016", "2010", "2020", "2005"], "dogru": 0, "img": "financial analysis ai chart"},
-    {"soru": "Dunyada en cok kullanilan yapay zeka guvenlik sistemi hangi alanda calisiyor?", "secenekler": ["Yuz tanima", "Ses tanima", "Parmak izi", "Goz tanima"], "dogru": 0, "img": "ai security face detection"},
-    {"soru": "Yapay zeka ile yapilan ilk otomatik stok yonetim sistemi hangi sektorde kullanildi?", "secenekler": ["Perakende", "Uretim", "Lojistik", "Tarim"], "dogru": 0, "img": "inventory management warehouse"},
-    {"soru": "Dunyada en cok kullanilan yapay zeka enerji yonetim sistemi hangi ulkede aktif?", "secenekler": ["Almanya", "ABD", "Cin", "Japonya"], "dogru": 0, "img": "smart energy management grid"},
-    {"soru": "Yapay zeka ile yapilan ilk otomatik trafik yonetim sistemi hangi sehirde calisiyor?", "secenekler": ["Singapur", "Tokyo", "New York", "Londra"], "dogru": 0, "img": "smart traffic management city"},
-    {"soru": "Dunyada en cok kullanilan yapay zeka cevrimici alisveris sistemi hangi platformda?", "secenekler": ["Amazon", "eBay", "Alibaba", "Trendyol"], "dogru": 0, "img": "ai ecommerce recommendation"},
-    {"soru": "Yapay zeka ile yapilan ilk otomatik egitim sistemi hangi derste kullanildi?", "secenekler": ["Matematik", "Tarih", "Biyoloji", "Fizik"], "dogru": 0, "img": "ai education classroom"},
+    {"soru": "Linux çekirdeğinin ilk sürümü kaç satır koddan oluşuyordu?", "secenekler": ["~10.000", "~240.000", "~1.000.000", "~500.000"], "dogru": 0, "bilgi": "Linus Torvalds 1991'de yazdı. İlk sürüm sadece 10.239 satırdı."},
+    {"soru": "Google'ın arama motoru ilk hangi dilde yazıldı?", "secenekler": ["Python", "Java", "C++", "Lisp"], "dogru": 2, "bilgi": "Larry Page ve Sergey Brin C++ ile yazdı. İlk adı 'BackRub' idi."},
+    {"soru": "Bir milyar satır kod hangi projede bulunur?", "secenekler": ["Windows 10", "Google Arama", "Facebook", "NASA Uzay Mekiği"], "dogru": 1, "bilgi": "Google'ın tüm kod tabanı yaklaşık 2 milyar satırdır."},
+    {"soru": "En çok satır koda sahip oyun hangisidir?", "secenekler": ["GTA V", "Cyberpunk 2077", "Red Dead Redemption 2", "Star Citizen"], "dogru": 3, "bilgi": "Star Citizen 50+ milyon satır kod ile rekor kırdı."},
+    {"soru": "Programlama dillerinde 'bug' terimi nereden geliyor?", "secenekler": ["Böcek hatası", "Hata raporu", "Eski Almanca", "Kod satırı"], "dogru": 0, "bilgi": "1947'de Grace Hopper bilgisayara yapışan bir böcek buldu."},
+    {"soru": "Python'da 'self' anahtar kelimesi ne anlama gelir?", "secenekler": ["Sınıf自身的 referans", "Değişken adı", "Fonksiyon çağrısı", "Modül adı"], "dogru": 0, "bilgi": "self, sınıf içindeki instance'ı temsil eder. Zorunlu değildir ama convention'dır."},
+    {"soru": "Bir API'ın 'REST' olmasının şartı nedir?", "secenekler": ["HTTP kullanması", "JSON döndürmesi", "6 mimari kurala uyması", "OAuth kullanması"], "dogru": 2, "bilgi": "REST, 6 mimari kısıta sahiptir. JSON veya XML dönüşü zorunlu değildir."},
+    {"soru": "Git'te 'rebase' ile 'merge' arasındaki fark nedir?", "secenekler": ["Rebase geçmişi temizler", "Merge daha hızlı", "İkisi aynı", "Rebase sadece Linux'ta çalışır"], "dogru": 0, "bilgi": "Rebase, commit geçmişini düzleştirir. Merge ise Dal oluşturmaya devam eder."},
+    {"soru": "Docker'ın temel mantığı nedir?", "secenekler": ["VM oluşturmak", "Uygulamayı izole container'a koymak", "Veritabanını klonlamak", "Kod derlemek"], "dogru": 1, "bilgi": "Docker, uygulamaları ve bağımlılıklarını izole eder. VM'lere göre çok daha hafiftir."},
+    {"soru": "Bir saniyede kaç tane JavaScript event loop'u çalışır?", "secenekler": ["Tek bir tane", "Çoklu", "Hiç", "Tarayıcıya göre değişir"], "dogru": 0, "bilgi": "JS tek thread'dir. Event loop, callback queue'dan sırayla işleri alır."},
+    {"soru": "En çok CVE açığı bulunan yazılım hangisidir?", "secenekler": ["Windows", "Linux Kernel", "Apache", "WordPress"], "dogru": 0, "bilgi": "Windows, tarihte en fazla güvenlik açığı bulunan yazılımdır."},
+    {"soru": "Stack Overflow'un kurucuları hangi siteden ilham aldı?", "secenekler": ["Wikipedia", "Expert Exchange", "Reddit", "Quora"], "dogru": 1, "bilgi": "Expert Exchange'in sinir bozucu ödeme duvarından bıkarak kuruldu."},
+    {"soru": "En çok pull request'e sahip GitHub repoları hangileri?", "secenekler": ["React, Vue", "VS Code, Flutter", "Python, Django", "Linux, Kubernetes"], "dogru": 1, "bilgi": "VS Code ve Flutter topluluk tarafından sürekli geliştirilir."},
+    {"soru": "MongoDB hangi veri yapısını kullanır?", "secenekler": ["Tablo", "JSON/BSON", "Ağaç", "Liste"], "dogru": 1, "bilgi": "MongoDB, BSON formatında document depolar. SQL tablosu yoktur."},
+    {"soru": "Kubernetes hangi şirkette geliştirildi?", "secenekler": ["Google", "Microsoft", "Amazon", "Red Hat"], "dogru": 0, "bilgi": "Google'da Borg projesinin devamı olarak geliştirildi. 2014'te açık kaynak oldu."},
+    {"soru": "React'te 'Virtual DOM' ne işe yarar?", "secenekler": ["Veritabanını önbelleğe almak", "Gerçek DOM'u hızlı güncellemek", "CSS'i yönetmek", "Router yapmak"], "dogru": 1, "bilgi": "Sanal DOM, değişiklikleri önce bellekte hesaplar, sonra minimum güncelleme yapar."},
+    {"soru": "Yapay zeka modeli 'GPT-4'ün tahmini parametre sayısı nedir?", "secenekler": ["100 milyar", "1 trilyon+", "500 milyar", "10 milyar"], "dogru": 1, "bilgi": "OpenAI resmi olarak açıklamadı. Tahminler 1 trilyon civarında."},
+    {"soru": "Rust dilinde 'ownership' sistemi neyi engeller?", "secenekler": ["Memory leak ve race condition", "Syntax hatası", "Compile hatası", "Runtime crash"], "dogru": 0, "bilgi": "Rust, compile-time'da memory safety sağlar. Garbage collector'a ihtiyaç duymaz."},
+    {"soru": "Redis'in hız sırrı nedir?", "secenekler": ["Veritabanı_optimizasyonu", "RAM'de çalışması", "SSD kullanımı", "Özel donanım"], "dogru": 1, "bilgi": "Redis tamamen RAM'de çalışır. 100.000+ sorguyu saniyede işleyebilir."},
+    {"soru": "Bir WordPress sitesi ortalama kaç KB ağırlığındadır?", "secenekler": ["~100 KB", "~500 KB", "~2 MB", "~10 MB"], "dogru": 3, "bilgi": "Ortalama WordPress sitesi 3MB+ yüklenir. Çoğu eklenti ve tema yüzünden."},
+    {"soru": "En uzun kod adı hangi üründe kullanıldı?", "secenekler": ["Windows Vista", "Mac OS X Tiger", "Android Pie", "iOS 6"], "dogru": 0, "bilgi": "Windows Vista'nın kod adı 'Longhorn' idi ve 5 yıl gecikti."},
+    {"soru": "Bir ‘Hello World’ programı kaç bayttan oluşabilir?", "secenekler": ["29 byte (x86 Linux)", "1 KB", "100 byte", "10 byte"], "dogru": 0, "bilgi": "x86 Linux'ta en küçük hello world 29 byte. Assembly ile yazılır."},
+    {"soru": "CERN'deki ilk web sitesi hangi adresteydi?", "secenekler": ["info.cern.ch", "www.cern.ch", "web.cern.ch", "cern.org"], "dogru": 0, "bilgi": "Tim Berners-Lee 1991'de info.cern.ch adresini oluşturdu."},
+    {"soru": "TensorFlow ve PyTorch arasında temel fark nedir?", "secenekler": ["TF statik, PyTorch dinamik graph", "İkisi aynı", "PyTorch daha yavaş", "TF açık kaynak değil"], "dogru": 0, "bilgi": "TensorFlow 1.x statik graph kullandı. PyTorch ise dinamik graph ile esneklik sağlar."},
+    {"soru": "En çok indirilen npm paketi hangisidir?", "secenekler": ["lodash", "react", "left-pad", "express"], "dogru": 0, "bilgi": "Lodash, React'i geçerek en çok indirilen paket oldu."},
+    {"soru": "Kuantum bilgisayar 'qubit' yerine hangi yapıyı kullanır?", "secenekler": ["Süperpozisyon", "Bit", "Byte", "Register"], "dogru": 0, "bilgi": "Qubit, 0 ve 1'in süperpozisyonunda olabilir. Geleneksel bit sadece birini tutar."},
+    {"soru": "Siber güvenlikte 'SQL injection' nasıl engellenir?", "secenekler": ["Parametreli sorgu", "Antivirüs", "Firewall", "Şifreleme"], "dogru": 0, "bilgi": "Parametreli Prepared Statements kullanmak SQL injection'ı %100 engeller."},
+    {"soru": "Fiber optik kablolar hangi prensiple çalışır?", "secenekler": ["Işık yansıması", "Elektrik akımı", "Manyetik alan", "Radyo dalgası"], "dogru": 0, "bilgi": "Total internal reflection ile ışık sinyali kilometrelerce kaybolmadan iletilir."},
+    {"soru": "Hangisi real-time operational system değildir?", "secenekler": ["Windows 10", "RTLinux", "VxWorks", "FreeRTOS"], "dogru": 0, "bilgi": "Windows 10 real-time değildir. RTLinux, VxWorks real-time OS'tür."},
+    {"soru": "Bir CPU'da 'cache miss' ne anlama gelir?", "secenekler": ["Veri L1/L2 cache'te yok", "CPU aşırı ısındı", "RAM dolu", "Fazla process çalışıyor"], "dogru": 0, "bilgi": "Cache miss, istenen veri önbellekte bulunamaz ve yavaş RAM'den okunur."},
+    {"soru": "Linux'ta 'chmod 777' ne yapar?", "secenekler": ["Herkese tam yetki verir", "Dosyayı siler", "Yedek alır", "İzinleri kaldırır"], "dogru": 0, "bilgi": "777 = read+write+execute for owner/group/other. Güvenlik açığıdır, kullanılmamalı."},
+    {"soru": "WebSocket ve HTTP arasındaki fark nedir?", "secenekler": ["WebSocket çift yönlü, HTTP tek yönlü", "İkisi aynı", "HTTP daha hızlı", "WebSocket eski"], "dogru": 0, "bilgi": "WebSocket sürekli açık bağlantı kurar. HTTP her istekte yeni bağlantı açar."},
+    {"soru": "En uzun programlama dili ismi hangisidir?", "secenekler": ["Brainfuck", "COBOL", "ANSI Common Lisp", "Haskell"], "dogru": 2, "bilgi": "ANSI Common Lisp resmi olarak en uzun resmi dile sahiptir."},
+    {"soru": "Bir SSD ile HDD arasındaki en belirgin fark nedir?", "secenekler": ["SSD mekanik parça içermez", "HDD daha hızlı", "SSD daha ucuz", "HDD daha dayanıklı"], "dogru": 0, "bilgi": "SSD'de hareketli parça yoktur. 10x daha hızlı, sessiz ve dayanıklıdır."},
+    {"soru": "DevOps'un temel amacı nedir?", "secenekler": ["Geliştirme ve operasyonları birleştirmek", "Yeni programlama dili oluşturmak", "Veritabanı yönetmek", "Tasarım yapmak"], "dogru": 0, "bilgi": "DevOps, CI/CD pipeline ile yazılım teslimatını hızlandırır."},
+    {"soru": "Linux'ta 'grep' komutu ne yapar?", "secenekler": ["Metin içinde arama yapar", "Dosya siler", "Dizin oluşturur", "İzin değiştirir"], "dogru": 0, "bilgi": "grep, regular expression ile dosya içeriklerinde arama yapar."},
+    {"soru": "Git'te 'cherry-pick' ne işe yarar?", "secenekler": ["Belirli bir commit'i diğer dala taşımak", "Branch silmek", "Push yapmak", "Log görmek"], "dogru": 0, "bilgi": "Cherry-pick, belirli bir commit'i current branch'e ekler."},
+    {"soru": "CDN'in açılımı ve görevi nedir?", "secenekler": ["Content Delivery Network - İçerik dağıtımı", "Code Development Node", "Central Database Network", "Cloud Deploy Network"], "dogru": 0, "bilgi": "CDN, statik dosyaları kullanıcılara en yakın sunucudan sunarak hız kazandırır."},
+    {"soru": "Bir web sitesinin 'Core Web Vitals' metrikleri nelerdir?", "secenekler": ["LCP, FID, CLS", "FPS, DPI, PPI", "CPU, RAM, GPU", "GET, POST, PUT"], "dogru": 0, "bilgi": "LCP (yüklenme), FID (etkileşim), CLS (görsel kararlılık) Google sıralama faktörü."},
+    {"soru": "NoSQL veritabanı neden tercih edilir?", "secenekler": ["Esnek şema ve yatay ölçekleme", "Daha güvenli", "Daha hızlı JOIN", "ACID garantisi"], "dogru": 0, "bilgi": "NoSQL, büyük veri ve esnek yapılar için idealdir. ACID yerine BASE modeli kullanır."},
+    {"soru": "En çok bilinen sızıntı (data breach) hangisidir?", "secenekler": ["Equifax", "Heartland", "Yahoo", "Adobe"], "dogru": 2, "bilgi": "Yahoo 3 milyar hesabın sızdırıldığı en büyük sızıntı oldu."},
+    {"soru": "Python'da 'list comprehension' nedir?", "secenekler": ["Tek satırda liste oluşturma", "Döngü yapısı", "Fonksiyon türü", "Sınıf tanımı"], "dogru": 0, "bilgi": "[x**2 for x in range(10)] şeklindedir. For döngüsüne göre 2x daha hızlıdır."},
+    {"soru": "Hangi programlama dili 'en yavaş' olarak bilinir?", "secenekler": ["Python", "Perl", "Ruby", "Fortran"], "dogru": 0, "bilgi": "Python yavaştır ama C kütüphaneleriyle hız kazanır. Hızdan çok okunabilirlik önemlidir."},
+    {"soru": "Bir SSH bağlantısının portu nedir?", "secenekler": ["22", "80", "443", "3306"], "dogru": 0, "bilgi": "SSH varsayılan olarak 22 portunu kullanır. HTTP 80, HTTPS 443, MySQL 3306."},
+    {"soru": "Bulut bilişimde 'serverless' ne anlama gelir?", "secenekler": ["Sunucu yönetimi gerektirmez", "Sunucu yoktur", "Sadece frontend", "Yerel sunucu"], "dogru": 0, "bilgi": "Serverless'ta sunucu vardır ama siz yönetmezsiniz. AWS Lambda buna örnektir."},
+    {"soru": "Bir SQL Injection saldırısında ' UNION ' neden kullanılır?", "secenekler": ["Birden fazla tabloyu birleştirmek için", "Verileri silmek için", "Şifre kırmak için", "Giriş yapmak için"], "dogru": 0, "bilgi": "UNION, saldırganın farklı tablolardan veri çekmesini sağlar."},
+    {"soru": "En popüler statik site üreticisi (SSG) hangisidir?", "secenekler": ["Next.js", "Hugo", "Jekyll", "Gatsby"], "dogru": 1, "bilgi": "Hugo, Go ile yazılmıştır ve 1000'den fazla sayfayı saniyeler içinde derler."},
+    {"soru": "Redis'in 'TTL' özelliği ne işe yarar?", "secenekler": ["Anahtarın ömrünü belirler", "Veritabanını yedekler", "Şifreleri çözer", "Bağlantı açar"], "dogru": 0, "bilgi": "TTL (Time To Live) ile anahtar belirli süre sonra otomatik silinir."},
+    {"soru": "En hızlı JavaScript motoru hangisidir?", "secenekler": ["V8", "SpiderMonkey", "JavaScriptCore", "Chakra"], "dogru": 0, "bilgi": "V8, Google Chrome ve Node.js tarafından kullanılır. JIT compilation yapar."},
+    {"soru": "Bir Docker container ile VM arasındaki fark nedir?", "secenekler": ["Container daha hafif, kernel paylaşır", "VM daha hızlı", "İkisi aynı", "Container GUI'ye sahip"], "dogru": 0, "bilgi": "Container OS seviyesinde sanallaştırır. VM donanım seviyesinde sanallaştırır."},
+    {"soru": "En çok kullanılan CI/CD aracı hangisidir?", "secenekler": ["GitHub Actions", "Jenkins", "GitLab CI", "Travis CI"], "dogru": 0, "bilgi": "GitHub Actions, GitHub entegrasyonu sayesinde en hızlı büyüyen CI/CD aracı."},
+    {"soru": "Bir web uygulamasında 'CORS' hatası ne anlama gelir?", "secenekler": ["Cross-Origin kaynak erişimi engellendi", "CSS hatası", "SQL hatası", "JS hatası"], "dogru": 0, "bilgi": "CORS, tarayıcının farklı origin'den gelen istekleri güvenlik nedeniyle engellemesidir."},
+    {"soru": "Kuantum computing'de 'quantum supremacy' ne demektir?", "secenekler": ["Kuantum bilgisayarın klasik bilgisayarı geçmesi", "Yeni işlemci türü", "Şifreleme yöntemi", "Yazılım dili"], "dogru": 0, "bilgi": "Google 2019'da Sycamore işlemcisi ile 200 saniyede 10.000 yıl süren işlemi yaptı."},
+    {"soru": "En çok star alan GitHub reposu hangisidir?", "secenekler": ["FreeCodeCamp", "VS Code", "React", "TensorFlow"], "dogru": 0, "bilgi": "FreeCodeCamp 350K+ ile en çok yıldız alan açık kaynak projesidir."},
+    {"soru": "Bir frontend framework'ü olan Svelte'in farkı nedir?", "secenekler": ["Compile-time'da çalışır, runtime gerekmez", "Daha yavaş", "Sadece mobil için", "React tabanlı"], "dogru": 0, "bilgi": "Svelte, bileşenleri compile eder. Virtual DOM kullanmaz, doğrudan DOM'u değiştirir."},
+    {"soru": "SQL'de 'JOIN' işlemi ne yapar?", "secenekler": ["Birden fazla tabloyu birleştirir", "Tabloyu siler", "Veri ekler", "İndeks oluşturur"], "dogru": 0, "bilgi": "JOIN, ortak alanlara göre tabloları birleştirir. INNER, LEFT, RIGHT, FULL türleri vardır."},
+    {"soru": "Bir yapay zeka modelinin 'overfitting' olması ne demektir?", "secenekler": ["Eğitim verisine çok iyi uyuyor ama genelleme yapamıyor", "Çok yavaş", "Veri eksik", "Donanım yetersiz"], "dogru": 0, "bilgi": "Overfitting, modelin eğitim verisini ezberlemesi ama yeni verilerde başarısız olmasıdır."},
+    {"soru": "Hangi dil 'Hello World' için en az kod satırı gerektirir?", "secenekler": ["Brainfuck", "Python", "C", "Java"], "dogru": 0, "bilgi": "Brainfuck'ta Hello World 8 karakterden oluşur ama okunması imkansızdır."},
+    {"soru": "En çok kullanılan versiyon kontrol sistemi hangisidir?", "secenekler": ["Git", "SVN", "Mercurial", "Perforce"], "dogru": 0, "bilgi": "Git, Linus Torvalds tarafından Linux çekirdeği için geliştirildi."},
+    {"soru": "Bir Redis verisi 'hash' olarak depolandığında avantajı nedir?", "secenekler": ["Alan bazlı erişim ve bellek tasarrufu", "Daha hızlı silme", "Şifreleme", "Yedekleme"], "dogru": 0, "bilgi": "Redis hash, küçük veriler için string'ten %60 daha az bellek kullanır."},
+    {"soru": "Dünyanın en eski aktif programlama dili hangisidir?", "secenekler": ["Fortran", "COBOL", "Lisp", "BASIC"], "dogru": 0, "bilgi": "Fortran 1957'de yazıldı. Hala bilimsel hesaplamalarda kullanılır."},
+    {"soru": "Bir API rate limiting'i neden uygulanır?", "secenekler": ["Sunucuyu aşırı yüklenmeden korumak", "Kullanıcı gizliliği", "Hız artırmak", "Veri şifrelemek"], "dogru": 0, "bilgi": "Rate limiting, istek sayısını sınırlandırarak DDoS saldırılarını ve aşırı kullanımı engeller."},
+    {"soru": "Bir 'microservice' mimarisinin avantajı nedir?", "secenekler": ["Her servis bağımsız dağıtılabilir", "Daha az server", "Daha az kod", "Daha basit"], "dogru": 0, "bilgi": "Microservice'ler bağımsız geliştirilir, dağıtılır ve ölçeklendirilir."},
+    {"soru": "En çok kullanılan veritabanı yönetim sistemi hangisidir?", "secenekler": ["MySQL", "PostgreSQL", "MongoDB", "SQLite"], "dogru": 0, "bilgi": "MySQL, Walmart, GitHub, Netflix gibi devler tarafından kullanılır."},
+    {"soru": "Bir web sitesinin 'DOMContentLoaded' olayı ne zaman tetiklenir?", "secenekler": ["HTML parse edildiğinde", "Tüm resimler yüklendiğinde", "CSS yüklendiğinde", "Sayfa tamamen kapandığında"], "dogru": 0, "bilgi": "DOMContentLoaded, DOM ağacı hazır olduğunda tetiklenir. CSS/resim beklemez."},
+    {"soru": "Bulut bilişimin 'IaaS' açılımı nedir?", "secenekler": ["Infrastructure as a Service", "Internet as a Service", "Integration as a Service", "Information as a Service"], "dogru": 0, "bilgi": "IaaS, sanal sunucu ve depolama hizmetidir. AWS EC2 buna örnektir."},
+    {"soru": "Python'da 'decorator' ne işe yarar?", "secenekler": ["Fonksiyona ek işlevsellik katar", "Değişken tanımlar", "Sınıf oluşturur", "Hata yakalar"], "dogru": 0, "bilgi": "@timer gibi decorator'lar fonksiyonların çalışma süresini ölçebilir."},
+    {"soru": "Linux'ta 'pipeline' (|) operatörü ne yapar?", "secenekler": ["Bir komutun çıktısını diğerine iletir", "Dosya siler", "Process öldürür", "Ağ bağlantısı kurar"], "dogru": 0, "bilgi": "ls | grep .py ile Python dosyalarını filtreleyebilirsin."},
+    {"soru": "Bir Agile sprint'i genellikle ne kadar sürer?", "secenekler": ["1-4 hafta", "1 gün", "3 ay", "6 ay"], "dogru": 0, "bilgi": "Sprintler genellikle 2 hafta sürer. Ama 1-4 hafta arası değişebilir."},
+    {"soru": "En çok kullanılan container registry hangisidir?", "secenekler": ["Docker Hub", "GitHub Packages", "AWS ECR", "Google Container Registry"], "dogru": 0, "bilgi": "Docker Hub, 10M+ resim ile en büyük container registry'dir."},
+    {"soru": "Bir 'WebSocket' bağlantısı kaç TCP bağlantısı kullanır?", "secenekler": ["1", "2", "4", "Hiç"], "dogru": 0, "bilgi": "WebSocket, HTTP upgrade ile tek TCP bağlantısına dönüşür."},
+    {"soru": "En hızlı büyüyen programlama dili hangisidir (2024)?", "secenekler": ["Rust", "Python", "TypeScript", "Go"], "dogru": 0, "bilgi": "Rust, 8 yıldır Stack Overflow'da 'en çok beğenilen dil' unvanını koruyor."},
+    {"soru": "Bir 'load balancer' ne işe yarar?", "secenekler": ["Trafikleri sunuculara dağıtır", "Veritabanını yönetir", "Kod derler", "Dosya depolar"], "dogru": 0, "bilgi": "Load balancer, gelen istekleri sunuculara eşit dağıtarak performans sağlar."},
+    {"soru": "Bir CSS 'grid' ile 'flexbox' arasındaki temel fark nedir?", "secenekler": ["Grid 2B, Flexbox 1B layout", "İkisi aynı", "Flexbox daha yeni", "Grid sadece mobilde çalışır"], "dogru": 0, "bilgi": "Flexbox tek eksende hizalama, Grid ise 2 boyutlu layout için kullanılır."},
+    {"soru": "En çok bilinen DDoS saldırısı hangi yıl ve hangi siteye yapıldı?", "secenekler": ["2016 - Dyn DNS", "2020 - AWS", "2018 - Cloudflare", "2014 - Google"], "dogru": 0, "bilgi": "Mirai botnet 2016'da Dyn DNS'e saldırı düzenledi. Twitter, Netflix erişilemez oldu."},
+    {"soru": "Bir 'CRON job' ne işe yarar?", "secenekler": ["Zamanlanmış görevleri çalıştırır", "Dosya siler", "Ağ bağlantısı kurar", "E-posta gönderir"], "dogru": 0, "bilgi": "Cron, Linux'ta belirli zaman aralıklarında otomatik görev çalıştırır."},
+    {"soru": "TypeScript'in JavaScript'e göre avantajı nedir?", "secenekler": ["Statik tip kontrolü", "Daha hızlı çalışma", "Daha az kod", "Tarayıcı desteği"], "dogru": 0, "bilgi": "TypeScript, compile-time'da hata yakalar. JS'e göre %15 daha az bug oluşur."},
+    {"soru": "Bir 'message queue' (RabbitMQ, Kafka) neden kullanılır?", "secenekler": ["Servisler arası asenkron iletişim", "Veritabanı yönetimi", "Frontend geliştirme", "Dosya depolama"], "dogru": 0, "bilgi": "Message queue, servisler arasındaki iletişimi多达队化 ederek dayanıklılık sağlar."},
+    {"soru": "En uzun aktif olan web sitesi hangisidir?", "secenekler": ["CERN (1991)", "Yahoo (1994)", "Amazon (1994)", "eBay (1995)"], "dogru": 0, "bilgi": "CERN'ün ilk web sitesi 1991'den beri aktif: info.cern.ch"},
+    {"soru": "Bir PostgreSQL veritabanının en büyük avantajı nedir?", "secenekler": ["ACID uyumluluğu ve JSON desteği", "En hızlı olması", "En az bellek kullanması", "Bedava olması"], "dogru": 0, "bilgi": "PostgreSQL, standart SQL'e JSONB desteği ile hem relational hem NoSQL gibidir."},
 ]
 
 
@@ -355,51 +339,54 @@ class UYTQuiz:
 
     def gorselleri_on_yukle(self):
         for i, soru in enumerate(self.sorular):
-            keyword = soru.get("img", "technology")
-            search = keyword.lower().replace(" ", "+")
-            url = f"https://loremflickr.com/640/360/{search}?lock={random.randint(1, 999999)}"
-            t = threading.Thread(target=self._gorsel_indir, args=(i, url), daemon=True)
-            t.start()
+            photo = self._yerel_gorsel_olustur(i, soru)
+            self.img_cache[i] = photo
 
-    def _gorsel_indir(self, index, url):
+    def _yerel_gorsel_olustur(self, index, soru):
+        colors = [
+            ("#1a1a2e", "#16213e", "#0f3460"),
+            ("#0d1117", "#161b22", "#21262d"),
+            ("#1b1b2f", "#162447", "#1f4068"),
+            ("#2d132c", "#3e1f47", "#4a2c5e"),
+            ("#0a192f", "#112240", "#1d3557"),
+            ("#1a1a2e", "#e94560", "#533483"),
+            ("#0f0e17", "#232946", "#b8c1ec"),
+            ("#16161a", "#242629", "#7f5af0"),
+        ]
+        c = colors[index % len(colors)]
+        img = Image.new("RGB", (640, 360), c[0])
+        draw = ImageDraw.Draw(img)
+        for y in range(360):
+            ratio = y / 360
+            r1 = int(c[0][1:3], 16)
+            g1 = int(c[0][3:5], 16)
+            b1 = int(c[0][5:7], 16)
+            r2 = int(c[2][1:3], 16)
+            g2 = int(c[2][3:5], 16)
+            b2 = int(c[2][5:7], 16)
+            r = int(r1 + (r2 - r1) * ratio)
+            g = int(g1 + (g2 - g1) * ratio)
+            b = int(b1 + (b2 - b1) * ratio)
+            draw.line([(0, y), (640, y)], fill=(r, g, b))
+        icons = ["{ }", "< />", "[ ]", "# _", "/ >", "( )", "< >", "=>"]
+        icon = icons[index % len(icons)]
         try:
-            r = requests.get(url, timeout=10)
-            if r.status_code == 200:
-                img = Image.open(BytesIO(r.content))
-                img = img.resize((640, 360), Image.LANCZOS)
-                photo = ImageTk.PhotoImage(img)
-                self.img_cache[index] = photo
+            font_big = ImageFont.truetype("arial.ttf", 80)
+            font_med = ImageFont.truetype("arial.ttf", 24)
+            font_sm = ImageFont.truetype("arial.ttf", 16)
         except Exception:
-            pass
+            font_big = ImageFont.load_default()
+            font_med = ImageFont.load_default()
+            font_sm = ImageFont.load_default()
+        draw.text((320, 120), icon, fill="#ffffff", font=font_big, anchor="mm")
+        draw.text((320, 220), f"Soru {index + 1}", fill="#ffffff", font=font_med, anchor="mm")
+        draw.text((320, 260), "UYT Bilgi Yarismasi", fill="#888888", font=font_sm, anchor="mm")
+        return ImageTk.PhotoImage(img)
 
     def fotograf_yukle(self, index):
         if index in self.img_cache:
             self.current_img = self.img_cache[index]
             self.img_label.configure(image=self.current_img, text="")
-        else:
-            soru = self.sorular[index]
-            keyword = soru.get("img", "technology")
-            search = keyword.lower().replace(" ", "+")
-            url = f"https://loremflickr.com/640/360/{search}?lock={random.randint(1, 999999)}"
-            my_id = self.img_id
-
-            def isle():
-                try:
-                    r = requests.get(url, timeout=10)
-                    if r.status_code == 200:
-                        img = Image.open(BytesIO(r.content))
-                        img = img.resize((640, 360), Image.LANCZOS)
-                        self.current_img = ImageTk.PhotoImage(img)
-                        self.img_cache[index] = self.current_img
-                        if self.img_id == my_id and self.img_label:
-                            self.root.after(0, lambda: self.img_label.configure(
-                                image=self.current_img, text=""))
-                except Exception:
-                    if self.img_id == my_id and self.img_label:
-                        self.root.after(0, lambda: self.img_label.configure(
-                            text="Gorsel yuklenemedi", fg=Gri))
-
-            threading.Thread(target=isle, daemon=True).start()
 
     def cevap_ver(self, secim):
         self.sure_aktif = False
@@ -430,7 +417,12 @@ class UYTQuiz:
             tk.Label(sonuc, text="-15 Saniye", font=("Helvetica", 40, "bold"),
                      fg=Kirmizi, bg=Siyah).pack()
             tk.Label(sonuc, text=f"Dogru cevap: {dogru_cevap}",
-                     font=("Helvetica", 16), fg=Gri, bg=Siyah).pack(pady=10)
+                     font=("Helvetica", 16), fg=Beyaz, bg=Siyah).pack(pady=(10, 5))
+
+        bilgi = soru.get("bilgi", "")
+        if bilgi:
+            tk.Label(sonuc, text=bilgi, font=("Helvetica", 12),
+                     fg=Sari, bg=Siyah, wraplength=800, justify="center").pack(padx=60, pady=(5, 0))
 
         self.soru_index += 1
 
