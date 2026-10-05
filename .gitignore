@@ -34,3 +34,6 @@ game2_camdraw/captures/
 game1_quiz/img_cache/
 game1_quiz/skorlar.db
 .aider*
+
+game2_camdraw/hand_landmarker.task
+game2_camdraw/hand_landmarker.task.tmp

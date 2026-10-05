@@ -39,6 +39,7 @@ Ya da `run.bat` dosyasına çift tıklayın.
 pip install -r requirements.txt
 ```
 > `opencv-python` ve `mediapipe` büyük paketlerdir; internet bağlantısı yeterli bir makinede kurun.
+> El takip modeli (`hand_landmarker.task`, ~7.6 MB) **ilk açılışta otomatik indirilir** ve klasöre kaydedilir; sonraki açılışlarda internet gerekmez.
 
 ## Dosyalar
 - `camdraw.py` : kamera + MediaPipe el takibi + çizim/şekil/taşıma/kilit
