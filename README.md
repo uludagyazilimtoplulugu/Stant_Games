@@ -6,18 +6,17 @@ Her oyun kendi klasöründe, bağımsız çalışacak şekilde yer alır.
 ## Klasörler
 | Klasör | Oyun | Açıklama |
 |--------|------|----------|
-| `game1_quiz/` | Bilgi Yarışması | İnternetten canlı çekilen sorular, her oyuncuya farklı; 10 soru, süre/pon sistemi, SQLite sıralama. |
-| `game2_camdraw/` | CamDraw | Kamera + el takibi; işaret parmağıyla çiz, yumrukla 3 sn sonra fotoğraf çek ve e-postaya gönder. |
+| `game1_quiz/` | Bilgi Yarışması | 200 eğlenceli teknoloji sorusu; her oyunda rastgele 15 soru, süre/puan sistemi, SQLite liderlik tablosu. |
+| `game2_camdraw/` | CamDraw | Kamera + el takibi; işaret parmağıyla çiz, kapalı şekil yap, parmak üçlüsüyle taşı, yumrukla kilitle. |
 | `game3_arcade/` | Sembol Avı | Kendi tasarladığımız tkinter tabanlı refleks oyunu; liderlik tablosu. |
 
 ## Oyun 1 — Bilgi Yarışması
-- Oyuncular isimlerini girer (1-8 kişi).
-- Sorular OpenTDB'den **canlı** çekilir ve her oyuncuya **farklı** 10 soru verilir.
-- Her oyuncuya **2 dakika**; yanlışta süre **15 sn** kısalır, doğruda **+10 puan**.
-- Tasarım: sol üstte süre, sağ üstte isim + puan, ortada soruyla ilgili resim,
-  altında 4 seçenek.
-- Skorlar `stant_oyun.db` (SQLite) içinde saklanır; gün sonu sıralaması ve
-  "Yeni Oyun" döngüsü mevcuttur.
+- Tek oyuncu; isim girilir ve oyun başlar.
+- `sorular.py` içindeki **200 soruluk havuzdan** her oyunda **rastgele 15 soru** seçilir (tekrar yok).
+- Kim Milyoner tarzı eğlenceli/şaşırtıcı teknoloji soruları; her cevaptan sonra sarı renkte **ilginç bilgi** gösterilir.
+- **2 dakika** süre; yanlışta **15 sn** kısalır, doğruda **+10 puan**.
+- Yerel üretilen görseller (internetsiz çalışır), 2×2 seçenek gridi, UYT renk paleti.
+- Skorlar `skorlar.db` (SQLite) içinde saklanır; liderlik tablosu ana menüde.
 ```bash
 cd game1_quiz
 pip install -r requirements.txt
@@ -25,10 +24,12 @@ python quiz.py
 ```
 
 ## Oyun 2 — CamDraw
-- Gönderen Gmail (uygulama şifresi) `config.json` içinde saklanır.
-- Oyuncu e-posta adresini girer; kamera açılır.
-- İşaret parmağıyla havada çizim, **yumruk** ile 3 sn geri sayım → fotoğraf çekilir
-  ve oyuncunun e-postasına gönderilir.
+- Kamera açılır; **hiçbir mail/adres/şifre istenmez**, fotoğraf çekilmez.
+- **İşaret parmağı** (diğerleri kapalı): havada çizim ve yazı.
+- **Kapalı kutu/şekil** çizerseniz şekil nesneye dönüşür (+5 puan).
+- **Başparmak + işaret + orta parmak**: nesneyi tutup ekranda taşırsınız.
+- **Yumruk**: ekranı kilitler; kapalıyken tekrar **yumruk** serbest bırakır.
+- Klavye: **c** temizle, **q/ESC** çıkış.
 ```bash
 cd game2_camdraw
 pip install -r requirements.txt
@@ -42,3 +43,6 @@ python camdraw.py
 cd game3_arcade
 python arcade.py
 ```
+
+## Çalıştırma
+Her klasördeki `run.bat` dosyasına çift tıklayarak ilgili oyunu başlatabilirsiniz.

@@ -1,73 +1,29 @@
-"""UYT Stant Oyunu 2 - Kamera ile Çiz & Yumrukla Çek & Mail Gönder.
+"""UYT Stant Oyunu 2 - Havada Çiz, Şekil Yap, Nesneleri Taşı.
 
-Akış:
-  1. Operatör gönderen Gmail'i ayarlar (config.json).
-  2. Oyuncu kendi e-posta adresini girer.
-  3. Kamera açılır; işaret parmağıyla havada çizim yapılır.
-  4. Yumruk yapılınca 3 saniyelik geri sayım başlar, sonunda fotoğraf
-     çekilip oyuncunun e-postasına GMAIL ile gönderilir.
+Jestler:
+  - İşaret parmağı (diğerleri kapalı) : ekranda serbestçe çiz / yaz.
+  - Kapalı kutu/şekil çizersen       : şekil bir nesneye dönüşür.
+  - Başparmak + işaret + orta parmak : nesneyi (şekil/yazı/resmi) tutup taşı.
+  - Yumruk                           : ekranı kilitler (çizim kapalı).
+  - Kapalıyken tekrar yumruk          : ekran yeniden serbest.
 
 Bağımlılıklar: opencv-python, mediapipe
 """
-import os
-import time
 import cv2
 import numpy as np
 import mediapipe as mp
-import tkinter as tk
-from tkinter import messagebox
 
-import config as config_mod
-import emailer
-
-
-# ---------- Yardımcılar ----------
-def ask_email():
-    """Oyuncudan e-posta adresini alır (Tkinter)."""
-    root = tk.Tk()
-    root.title("UYT - E-posta Gir")
-    root.configure(bg="#0d1b2a")
-    root.geometry("460x220")
-    root.resizable(False, False)
-    tk.Label(root, text="Fotoğrafın hangi e-postaya gönderilsin?",
-             bg="#0d1b2a", fg="#f4a261", font=("Segoe UI", 13)).pack(pady=20)
-    entry = tk.Entry(root, font=("Segoe UI", 15), bg="#1b263b", fg="white",
-                     insertbackground="white", relief="flat", justify="center")
-    entry.pack(fill="x", padx=40, ipady=8)
-    entry.focus()
-    result = {}
-
-    def on_ok():
-        v = entry.get().strip()
-        if "@" not in v or "." not in v.split("@")[-1]:
-            messagebox.showwarning("Hatalı", "Geçerli bir e-posta girin.")
-            return
-        result["email"] = v
-        root.destroy()
-
-    def on_cancel():
-        result["cancel"] = True
-        root.destroy()
-
-    btn = tk.Frame(root, bg="#0d1b2a")
-    btn.pack(pady=20)
-    tk.Button(btn, text="📷 Başlat", command=on_ok, bg="#e63946", fg="white",
-              font=("Segoe UI", 13, "bold"), relief="flat", padx=25, pady=8).pack(side="left", padx=8)
-    tk.Button(btn, text="Çıkış", command=on_cancel, bg="#1b263b", fg="#e0e1dd",
-              font=("Segoe UI", 12), relief="flat", padx=20, pady=8).pack(side="left", padx=8)
-    entry.bind("<Return>", lambda e: on_ok())
-    root.mainloop()
-    return result
+UYT_MAVI = (237, 100, 38)      # BGR -> #2563EB
+CYAN = (0, 255, 255)
+KIRMIZI = (68, 68, 239)
+SARI = (0, 213, 245)
 
 
 def fingers_state(landmarks, label):
     """4 parmak için dik/çökük durumu ve başparmak durumunu döndürür."""
     tips = [8, 12, 16, 20]
     pips = [6, 10, 14, 18]
-    up = []
-    for t, p in zip(tips, pips):
-        up.append(landmarks[t].y < landmarks[p].y)
-    # Başparmak: sağ el için ucu MCP'den solda, sol el için sağda
+    up = [landmarks[t].y < landmarks[p].y for t, p in zip(tips, pips)]
     if label == "Right":
         thumb_up = landmarks[4].x < landmarks[2].x
     else:
@@ -75,7 +31,21 @@ def fingers_state(landmarks, label):
     return up, thumb_up
 
 
-def run_camera(recipient, sender):
+def kapali_mi(points):
+    """İlk ve son nokta yakınsa ve yeterli nokta varsa şekil kapalıdır."""
+    if len(points) < 12:
+        return False
+    x0, y0 = points[0]
+    x1, y1 = points[-1]
+    xs = [p[0] for p in points]
+    ys = [p[1] for p in points]
+    boy = max(max(xs) - min(xs), max(ys) - min(ys))
+    if boy < 35:
+        return False
+    return ((x0 - x1) ** 2 + (y0 - y1) ** 2) ** 0.5 < boy * 0.45
+
+
+def run_camera():
     mp_hands = mp.solutions.hands
     hands = mp_hands.Hands(
         static_image_mode=False,
@@ -86,121 +56,163 @@ def run_camera(recipient, sender):
 
     cap = cv2.VideoCapture(0)
     if not cap.isOpened():
-        messagebox.showerror("Kamera", "Kamera açılamadı (index 0).")
+        print("Kamera açılamadı (index 0).")
         return
 
     W = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or 640
     H = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or 480
 
-    paint = np.zeros((H, W, 3), dtype=np.uint8)
-    prev = None  # önceki işaret parmağı noktası
-    fist_prev = False
-    capturing = False
-    capture_start = 0.0
-    sent = False
-    sent_time = 0.0
-    DRAW_COLOR = (0, 255, 255)  # cyan
-
-    out_dir = os.path.join(os.path.dirname(__file__), "captures")
-    os.makedirs(out_dir, exist_ok=True)
+    nesneler = []          # bitmis cizimler/sekiller: {"nokta": [(x,y)...], "renk": .., "sekil": bool}
+    aktif = None           # su an cizilen cizgi
+    tasima_id = None       # tutulan nesnenin indeksi
+    onceki_tasima = None   # bir onceki tasima parmak ucu
+    kilitli = False
+    yumruk_onceki = False
+    isaret_onceki = False
+    puan = 0
 
     def put_text(img, text, pos, scale=0.9, color=(255, 255, 255), thick=2):
         cv2.putText(img, text, pos, cv2.FONT_HERSHEY_SIMPLEX, scale, color, thick, cv2.LINE_AA)
+
+    def nesne_ciz(img, n):
+        pts = np.array(n["nokta"], np.int32)
+        if n.get("sekil") and len(pts) >= 3:
+            cv2.polylines(img, [pts], True, n["renk"], 3, cv2.LINE_AA)
+        else:
+            cv2.polylines(img, [pts], False, n["renk"], 4, cv2.LINE_AA)
 
     while True:
         ret, frame = cap.read()
         if not ret:
             break
-        frame = cv2.flip(frame, 1)  # ayna görüntüsü
+        frame = cv2.flip(frame, 1)
 
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         results = hands.process(rgb)
 
-        drawing = False
-        fist = False
+        ciziyor = False
+        tasıyor = False
+        yumruk = False
+        parmak_ucu = None
+
         if results.multi_hand_landmarks and results.multi_handedness:
             hand = results.multi_hand_landmarks[0]
             label = results.multi_handedness[0].classification[0].label
             up, thumb_up = fingers_state(hand.landmark, label)
-            index_up = up[0]
-            others_down = (not up[1]) and (not up[2]) and (not up[3])
-            drawing = index_up and others_down
-            fist = (not any(up)) and (not thumb_up)
 
-            # işaret parmağı ucu (landmark 8)
+            isaret = up[0]
+            orta = up[1]
+            yuzuk = up[2]
+            serce = up[3]
+            digerleri_kapali = (not orta) and (not yuzuk) and (not serce)
+            yumruk = (not any(up)) and (not thumb_up)
+
+            # Basparmak + isaret + orta birlikte -> nesne tasi
+            if thumb_up and isaret and orta and (not yuzuk) and (not serce):
+                tasıyor = True
+            elif isaret and digerleri_kapali:
+                ciziyor = True
+
             lm = hand.landmark[8]
-            cx, cy = int(lm.x * W), int(lm.y * H)
-            if drawing and not (capturing or sent):
-                if prev is not None:
-                    cv2.line(paint, prev, (cx, cy), DRAW_COLOR, 5, cv2.LINE_AA)
-                prev = (cx, cy)
-            else:
-                prev = None
+            parmak_ucu = (int(lm.x * W), int(lm.y * H))
         else:
-            prev = None
+            isaret_onceki = False
 
-        # Yumruk -> çekim tetikleme (false->true geçişi)
-        if fist and not fist_prev and not capturing and not sent:
-            capturing = True
-            capture_start = time.time()
-        fist_prev = fist
+        # --- Yumruk: kilidi ac/kapa (kenar tetikli) ---
+        if yumruk and not yumruk_onceki:
+            kilitli = not kilitli
+            aktif = None
+            tasima_id = None
+            onceki_tasima = None
+        yumruk_onceki = yumruk
 
-        # Çekim geri sayımı
-        if capturing:
-            elapsed = time.time() - capture_start
-            if elapsed >= 3.0:
-                # Fotoğrafı kaydet
-                photo = cv2.add(frame, paint)
-                ts = time.strftime("%Y%m%d_%H%M%S")
-                path = os.path.join(out_dir, f"uyt_{ts}.png")
-                cv2.imwrite(path, photo)
-                # Mail gönder
-                try:
-                    emailer.send_photo(sender["sender_email"],
-                                       sender["sender_password"], recipient, path)
-                    send_ok = True
-                except Exception as e:
-                    send_ok = False
-                    print("Mail hatası:", e)
-                capturing = False
-                sent = True
-                sent_time = time.time()
-                sent_ok_flag = send_ok
+        # --- Cizim / tasima (kilitli degilse) ---
+        if not kilitli and parmak_ucu is not None:
+            if tasıyor:
+                x, y = parmak_ucu
+                if tasima_id is None:
+                    # en yakin nesneyi tut
+                    en_yakin, uzaklik = None, 60
+                    for i, n in enumerate(nesneler):
+                        cx = sum(p[0] for p in n["nokta"]) / len(n["nokta"])
+                        cy = sum(p[1] for p in n["nokta"]) / len(n["nokta"])
+                        d = ((cx - x) ** 2 + (cy - y) ** 2) ** 0.5
+                        if d < uzaklik:
+                            en_yakin, uzaklik = i, d
+                    tasima_id = en_yakin
+                if tasima_id is not None and onceki_tasima is not None:
+                    dx = x - onceki_tasima[0]
+                    dy = y - onceki_tasima[1]
+                    nesneler[tasima_id]["nokta"] = [
+                        (p[0] + dx, p[1] + dy) for p in nesneler[tasima_id]["nokta"]
+                    ]
+                onceki_tasima = (x, y)
+                aktif = None
+            elif ciziyor:
+                onceki_tasima = None
+                x, y = parmak_ucu
+                if aktif is None or not isaret_onceki:
+                    aktif = {"nokta": [(x, y)], "renk": CYAN, "sekil": False}
+                else:
+                    aktif["nokta"].append((x, y))
+                # Kapali cizim -> sekil nesnesi
+                if len(aktif["nokta"]) >= 12 and kapali_mi(aktif["nokta"]):
+                    aktif["sekil"] = True
+                    nesneler.append(aktif)
+                    aktif = None
+                    puan += 5
             else:
-                put_text(frame, f"CEKIM: {3 - int(elapsed)}",
-                         (W // 2 - 80, 60), 1.4, (0, 0, 255), 3)
-                put_text(frame, "Yumruk acmayin!", (W // 2 - 110, 100), 0.7, (0, 0, 255), 2)
+                # parmak modu degisti: cizgiyi nesneye cevir
+                onceki_tasima = None
+                if aktif is not None and len(aktif["nokta"]) >= 3:
+                    nesneler.append(aktif)
+                aktif = None
+        else:
+            if aktif is not None and len(aktif["nokta"]) >= 3:
+                nesneler.append(aktif)
+            aktif = None
+            onceki_tasima = None
+            tasima_id = None
 
-        # Gönderildi bildirimi
-        if sent:
-            if time.time() - sent_time > 3.0:
-                sent = False
-                paint = np.zeros((H, W, 3), dtype=np.uint8)  # temizle
-                prev = None
-            else:
-                msg = "GONDERILDI ✔" if sent_ok_flag else "MAIL HATASI"
-                put_text(frame, msg, (W // 2 - 120, H // 2), 1.2,
-                         (0, 255, 0) if sent_ok_flag else (0, 0, 255), 3)
-                put_text(frame, recipient, (W // 2 - 150, H // 2 + 40), 0.7, (255, 255, 255), 2)
+        isaret_onceki = ciziyor and not tasıyor
 
-        # Çizimi görüntüye ekle
-        display = cv2.add(frame, paint)
+        # --- GORUNTU ---
+        display = frame.copy()
+        for n in nesneler:
+            nesne_ciz(display, n)
+        if aktif is not None:
+            nesne_ciz(display, aktif)
 
-        # Üst bilgi
-        put_text(display, f"-> {recipient}", (10, 25), 0.6, (200, 200, 200), 1)
-        put_text(display, "Isaret parmagi: ciz  |  Yumruk: 3sn sonra cek", (10, H - 15), 0.6, (180, 180, 180), 1)
-        if drawing:
-            put_text(display, "[CIZIYOR]", (W - 160, 25), 0.7, (0, 255, 255), 2)
+        # isaret parmağı imleci
+        if parmak_ucu is not None and not kilitli:
+            renk = SARI if tasıyor else CYAN
+            cv2.circle(display, parmak_ucu, 10, renk, 2, cv2.LINE_AA)
+
+        # HUD
+        put_text(display, f"Puan: {puan}", (10, 30), 0.8, UYT_MAVI, 2)
+        if kilitli:
+            cv2.rectangle(display, (0, H - 70), (W, H), (40, 40, 60), -1)
+            put_text(display, "EKRAN KİLİTLİ - tekrar yumruk yapın", (10, H - 35),
+                     0.75, KIRMIZI, 2)
+            put_text(display, "Çıkış: q / ESC   |   Temizle: c", (10, H - 10),
+                     0.5, (170, 170, 170), 1)
+        else:
+            mod = "[TAŞIYOR]" if tasıyor else "[ÇİZİYOR]" if ciziyor else ""
+            if mod:
+                renk = SARI if tasıyor else CYAN
+                put_text(display, mod, (W - 190, 30), 0.75, renk, 2)
+            put_text(display,
+                     "İşaret: çiz/yaz  |  Kapalı şekil: nesne  |  Baş+İşaret+Orta: taşı  |  Yumruk: kilitle",
+                     (10, H - 12), 0.55, (180, 180, 180), 1)
 
         cv2.imshow("UYT - CamDraw", display)
         key = cv2.waitKey(1) & 0xFF
-        if key in (ord("q"), 27):  # q / ESC
+        if key in (ord("q"), 27):
             break
         elif key == ord("c"):
-            paint = np.zeros((H, W, 3), dtype=np.uint8)
-            prev = None
-        elif key == ord("n"):  # yeni oyuncu
-            break
+            nesneler.clear()
+            aktif = None
+            puan = 0
 
     cap.release()
     cv2.destroyAllWindows()
@@ -208,17 +220,7 @@ def run_camera(recipient, sender):
 
 
 def main():
-    sender = config_mod.ensure_sender()
-    if not sender.get("sender_email"):
-        return
-    while True:
-        res = ask_email()
-        if res.get("cancel") or "email" not in res:
-            break
-        run_camera(res["email"], sender)
-        again = messagebox.askyesno("Devam", "Yeni bir oyuncu ile devam edilsin mi?")
-        if not again:
-            break
+    run_camera()
 
 
 if __name__ == "__main__":

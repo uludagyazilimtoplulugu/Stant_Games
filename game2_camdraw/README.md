@@ -1,44 +1,46 @@
-# UYT Stant Oyunu 2 — Kamera ile Çiz & Yumrukla Çek & Mail Gönder
+# UYT Stant Oyunu 2 — Havada Çiz, Şekil Yap, Nesneleri Taşı
 
 ## Oyun Açıklaması
-Kamera açılır ve işaret parmağını hareket ettirerek ekranda yazı yapılır.
-Yumruk yapılması ile **3 saniyelik geri sayım** başlar ve sonunda fotoğraf çekilir.
-Çekilen fotoğraf, oyuncunun başına girdiği e-posta adresine **Gmail** üzerinden otomatik gönderilir.
+Kamera açılır, ekranda **el hareketlerinizle** çizim ve şekiller yaparsınız. Tamamen yerel çalışır; **fotoğraf çekilmez, mail gönderilmez, hiçbir hesap/şifre istenmez.**
+
+### Jestler
+| Jest | Ne yapar |
+|---|---|
+| **İşaret parmağı** (diğer parmaklar kapalı) | Ekranda serbestçe **çizir ve yazı yazarsınız** |
+| **Kapalı kutu/şekil çizmek** (işaret parmağıyla) | Çizdiğiniz kapalı şekil bir **nesneye** dönüşür (puan +5) |
+| **Başparmak + işaret + orta parmak** (birlikte) | Yakındaki nesneyi (şekil/yazı/çizim) **tutup ekranda taşırsınız** |
+| **Yumruk** | Ekran **kilitlenir** — çizim ve taşıma kapalı |
+| **Kapalıyken tekrar yumruk** | Ekran yeniden **serbest** hale gelir |
 
 ## Akış
-1. **Operatör Ayarları** (bir kez): `config.json` içinde gönderen Gmail adresi ve uygulama şifresi kaydedilir.
-2. **Oyuncu Giriimi**: Oyuncu kendi e-posta adresini girer.
-3. **Kamera Açılır**: İşaret parmağı (index parmağı diğerleri ile birlikte yukarı yukarı çıktığında) havada **yazı yapabilirsiniz**.
-4. **Yumruk Yapın**: Tüm parmaklar bendirildiği (yumruk) anı 3 saniye geri sayım başlar.
-5. **Fotoğraf Çekildikten Sonra**: 3 sanika içinde fotoğraf oyuncunun girdiği e-postaya gönderilir ve "GÖNDERİLDİ" bildirimi gösterilir.
+1. `run.bat` ile oyunu başlatın (kamera açılır).
+2. İşaret parmağıyla havada yazın/çizin.
+3. Kutu ya da kapalı bir şekil çizerseniz o şekil nesneye dönüşür, taşıyabilirsiniz.
+4. Baş + işaret + orta parmağı birleştirip bir nesnenin üstüne gelin ve sürükleyerek taşıyın.
+5. Yumrukla ekranı kilitleyin, tekrar yumrukla açın.
+6. Bitirince **q** veya **ESC** ile çıkın.
 
-## Gmail "Uygulama Şifresi" Nedir?
-Gmail normal şifre ile SMTP login kabul etmez. Adımlar:
-1. Google hesabınızda **2 Adımlı Doğrulama**'yı açın.
-2. https://myaccount.google.com/apppasswords adresinden **Uygulama Şifresi** oluşturun.
-3. Program ilk açıldığında bu şifreyi (ve gönderen Gmail adresini) girin; `config.json` içine kaydedilir.
+## Kontroller (klavye)
+- **c**: ekranı ve puanı temizler
+- **q / ESC**: çıkış
+
+## Tasarım
+UYT renk paleti: koyu arka plan, mavi vurgu `#2563EB`, sarı taşıma imleci, kırmızı kilit uyarısı.
 
 ## Nasıl Çalıştırılır
 ```bash
 cd game2_camdraw
 python camdraw.py
 ```
-Ya da doğrudan `run.bat` dosyasına tıklayarak Oyun başlatılabilir.
+Ya da `run.bat` dosyasına çift tıklayın.
 
 ## Gerekli Paketler
 ```bash
 pip install -r requirements.txt
 ```
-> `opencv-python` ve `mediapipe` büyük paketlerdir. İnternet bağlantısı yeterli bir makinede kurun.
-
-## Kontroller
-- **İşaret parmağı** (diğerleri kapalı): Çizim yapar.
-- **Yumruk**: 3 sn geri sayım → fotoğraf çekilir ve mail gönderilir.
-- **c**: çizimi temizler.
-- **n**: yeni oyuncu (yeni e-posta sorar).
-- **q / ESC**: çıkış.
+> `opencv-python` ve `mediapipe` büyük paketlerdir; internet bağlantısı yeterli bir makinede kurun.
 
 ## Dosyalar
-- `config.py` : gönderen hesap ayarı (config.json).
-- `emailer.py` : SMTP ile fotoğraf gönderme (saf stdlib, test edilebilir).
-- `camdraw.py` : kamera + MediaPipe el takibi + çizim + çekim.
+- `camdraw.py` : kamera + MediaPipe el takibi + çizim/şekil/taşıma/kilit
+- `run.bat` : çift tıkla çalıştırıcı
+- `README.md` : bu dosya
